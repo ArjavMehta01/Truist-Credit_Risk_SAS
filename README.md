@@ -2,7 +2,16 @@
 Summer Project 2020 - Credit Risk Modelling
 
 # Content
- ## Data
- ### Acq
- ### Perf
- ## Data Analysis
+  libraries.sas
+  
+  \_test.sas
+* Data  
+  + Acquisition
+  + Performance
+* Data Analysis
+  + Import
+    + importing.sas
+    + download.sas
+  + Analysis
+    + summary.sas
+
