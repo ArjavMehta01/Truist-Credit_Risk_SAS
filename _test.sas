@@ -6,3 +6,5 @@
 proc sql outobs = 5;
   select * from sashelp.cars;
 quit;
+
+ * Nishang have succeeded in clone to repository and run the code .
