@@ -1,12 +1,21 @@
 /* Author: Jonas */
-/* Purpose: Import Loan performance data from LOCAL Path */
+/* Purpose: Import Loan performance data and macroeconomics from Google Drive */
 
-* change the value of this macro variable: Q1-Q4;
-%let quater = Q1;
 
-%let y_start = 2005;
-%let y_end = 2017;
 
+
+* You can download shared file and save as tmp.txt by running this code;
+
+%let id = %nrstr(164e4YneTI1zNnmDRv7AMP_hPMH4N76-e);
+%let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&id;
+
+filename _local "/folders/myfolders/GitHub/Truist-Credit_Risk_SAS/Data Analysis/tmp.txt";
+
+proc http method="get" 
+  url = "&_url" 
+  out = _local 
+;
+run;
 
 
 %let acq_head = loan_id :$12.     orig_chn :$1.     seller :$80.
@@ -38,10 +47,11 @@
   *****************************************;
   ** import and format acquisition files **;
   *****************************************;
-  filename f_acq "&p_acq";
+  %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id&date;
+  filename url_file url "&_url";
   
   data &output..acq_&date;
-    infile f_acq("Acquisition_&date..txt") dlm = "|" missover dsd lrecl=32767 &option;
+    infile url_file dlm = "|" missover dsd lrecl=32767 &option;
     input &acq_head;
     
     *date conversion;
@@ -59,10 +69,12 @@
   *****************************************;
   ** import and format performance files **;
   *****************************************;
-  filename f_act "&p_perf";
   
-  data &outfile..tmp;
-    infile f_act("Performance_&date..txt") dlm = "|" missover dsd lrecl=32767 &option;
+  %let _url = %nrstr(https://docs.google.com/uc?export=download&confirm=ZOEm&id=)&&id&date;
+  filename url_file url "&_url";
+
+  data tmp;
+    infile f_perf("Performance_&date..txt") dlm = "|" missover dsd lrecl=32767 obs = 10;*&option;
     input &perf_head;
     
     *date conversion;
@@ -85,35 +97,30 @@
 
 
  *sorting loans by activity date to keep in chronological order;
-/*   proc sort data = tmp; */
-/*     by loan_id y_act_date; */
-/*   run; */
+  proc sort data = tmp;
+    by loan_id y_act_date;
+  run;
+  
   
   
 %mend perf;
 
-********************;
-** testing macros **;
-********************;
+
+
+
 /*
-%let o_test = %str(obs=10);
+%let id05q1 = %nrstr(164e4YneTI1zNnmDRv7AMP_hPMH4N76-e);
+%let id06q1 = %nrstr(1wxhs7I4KCp0LYdgi0v6_w0Di7hwhf7O6);
 
-%acq(2005Q1, work, &o_test)
-%perf(2005Q1, work, &o_test)
+%acq(06q1, work, %str(obs=10))
+/* %acq(06q1, ACQ) */
+
+/* https://docs.google.com/uc?export=download&id=1Pwr-bjPX28EtPPwqGfPLJYhpWOz8odXk */
+/*
+%let id05q1 = %nrstr(1Pwr-bjPX28EtPPwqGfPLJYhpWOz8odXk);
+
+
+%perf(2005Q1, work, %str(obs=10))
 */
-
-*******************************;
-** running acquisition files **;
-*******************************;
-%macro q1loop(end);
-  %do y_id = &y_start %to &end;
-  %acq(&y_id&quater, ACQ)
-/*   %perf(&id, ACT) */
-  %end;
-%mend q1loop;
-
-
-%q1loop(&y_end)
-
-
+endsas;
   
