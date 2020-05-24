@@ -382,3 +382,323 @@
 %LPPUB(2001Q2);
 %LPPUB(2001Q3);
 %LPPUB(2001Q4);
+*Stacking Loan Level files to create full dataset;
+
+data combined_data;
+  set comb_2000q1 comb_2000q2 comb_2000q3 comb_2000q4 comb_2001q1 comb_2001q2 
+    comb_2001q3 comb_2001q4 comb_2002q1 comb_2002q2 comb_2002q3 comb_2002q4 
+    comb_2003q1 comb_2003q2 comb_2003q3 comb_2003q4 comb_2004q1 comb_2004q2 
+    comb_2004q3 comb_2004q4 comb_2005q1 comb_2005q2 comb_2005q3 comb_2005q4 
+    comb_2006q1 comb_2006q2 comb_2006q3 comb_2006q4 comb_2007q1 comb_2007q2 
+    comb_2007q3 comb_2007q4 comb_2008q1 comb_2008q2 comb_2008q3 comb_2008q4 
+    comb_2009q1 comb_2009q2 comb_2009q3 comb_2009q4 comb_2010q1 comb_2010q2 
+    comb_2010q3 comb_2010q4 comb_2011q1 comb_2011q2 comb_2011q3 comb_2011q4 
+    comb_2012q1 comb_2012q2 comb_2012q3 comb_2012q4 comb_2013q1 comb_2013q2 
+    comb_2013q3 comb_2013q4 comb_2014q1 comb_2014q2 comb_2014q3 comb_2014q4 
+    comb_2015q1 comb_2015q2 comb_2015q3 comb_2015q4;
+run;
+
+proc sort data=combined_data;
+  by loan_id;
+run;
+
+************************************;
+********start of analysis********;
+************************************;
+** create dataset for summary tables **;
+
+data myfolder.statsum;
+  set combined_data;
+  ** Acquisition Table Flags **;
+  *building flags for second lien, non owner occupied, refinanced, and mortgage insured properties;
+
+  if ocltv > oltv then
+    seclien=1;
+  else
+    seclien=0;
+
+  if occ_stat in ("I", "S") then
+    nonown=1;
+  else
+    nonown=0;
+
+  if purpose in ("C", "R", "U") then
+    refis=1;
+  else
+    refis=0;
+
+  if mi_pct > 0 then
+    mi=1;
+  else
+    mi=0;
+  ** terminal counts **;
+
+  if last_stat in ("C", "1", "2", "3", "4", "5", "6", "7", "8", "9") then
+    active_cnt=1;
+  else
+    active_cnt=0;
+
+  if last_stat in ("C", "1", "2", "3", "4", "5", "6", "7", "8", "9") then
+    active_upb=last_upb;
+  else
+    active_upb=0;
+  active_upb_mil=active_upb/1000000;
+
+  if last_stat="P" then
+    prepaid_cnt=1;
+  else
+    prepaid_cnt=0;
+
+  if last_stat="F" then
+    reo_cnt=1;
+  else
+    reo_cnt=0;
+
+  if last_stat in ("S", "T") then
+    alt_cnt=1;
+  else
+    alt_cnt=0;
+
+  if last_stat="R" then
+    repurch_cnt=1;
+  else
+    repurch_cnt=0;
+  *default upb is the final reported upb for loans in our defaulted loan population;
+
+  if complt_flg=1 then
+    default_upb=last_upb;
+  else
+    default_upb=0;
+  ** performance rates **;
+  *calculating the portion of our originations that defaults, and the portion of originations that we lose due to default;
+  default_rt=default_upb/orig_amt;
+
+  if complt_flg=1 then
+    nloss_rt=net_loss/orig_amt;
+  else
+    nloss_rt=0;
+  ** loss components & net severity **;
+  *calculating costs and proceeds due to default relative to the upb for those defaulted loans;
+  tot_proc=sum(ns_procs, ce_procs, rmw_procs, o_procs);
+  tot_exp=sum(fcc_cost, pp_cost, ar_cost, ie_cost, tax_cost);
+  tot_cost=sum(int_cost, tot_exp, last_upb);
+
+  if complt_flg=1 then
+    do;
+      int_cost1=int_cost/default_upb;
+      tot_exp1=tot_exp/default_upb;
+      fcc_cost1=fcc_cost/default_upb;
+      pp_cost1=pp_cost/default_upb;
+      ar_cost1=ar_cost/default_upb;
+      ie_cost1=ie_cost/default_upb;
+      tax_cost1=tax_cost/default_upb;
+      tot_cost1=tot_cost/default_upb;
+      ns_procs1=ns_procs/default_upb;
+      ce_procs1=ce_procs/default_upb;
+      rmw_procs1=rmw_procs/default_upb;
+      o_procs1=o_procs/default_upb;
+      tot_proc1=tot_proc/default_upb;
+    end;
+  ** refinance type/occupancy counts **;
+
+  if occ_stat='I' then
+    inv_cnt=1;
+  else
+    inv_cnt=0;
+
+  if occ_stat='P' then
+    pri_cnt=1;
+  else
+    pri_cnt=0;
+
+  if occ_stat='S' then
+    sec_cnt=1;
+  else
+    sec_cnt=0;
+
+  if purpose='C' then
+    co_cnt=1;
+  else
+    co_cnt=0;
+
+  if purpose='P' then
+    pur_cnt=1;
+  else
+    pur_cnt=0;
+
+  if purpose='R' then
+    rt_cnt=1;
+  else
+    rt_cnt=0;
+
+  if purpose='U' then
+    u_cnt=1;
+  else
+    u_cnt=0;
+  ** credit score buckets **;
+
+  if 0 < cscore_mn < 620 then
+    cscorebkt='[0-620)';
+
+  if 620 <=cscore_mn < 660 then
+    cscorebkt='[620-660)';
+
+  if 660 <=cscore_mn < 700 then
+    cscorebkt='[660-700)';
+
+  if 700 <=cscore_mn < 740 then
+    cscorebkt='[700-740)';
+
+  if 740 <=cscore_mn < 780 then
+    cscorebkt='[740-780)';
+
+  if 780 <=cscore_mn then
+    cscorebkt='[780+)';
+  *building a variable to sum loans in each credit bucket;
+  count=1;
+run;
+
+* opening the excel document that we will write acquisition, performance, and historical loss statistics to;
+* file will save to the same folder as the sas code;
+ods tagsets.excelxp file="./lppub loss summary tables.xls" style=seaside 
+  options (fittopage='yes' pages_fitwidth='1' pages_fitheight='1' 
+  autofit_height='yes');
+* building a tab with loan counts by refinance purpose;
+ods tagsets.excelxp options(sheet_interval='none' 
+  sheet_name='vint.refi.counts');
+
+proc tabulate data=myfolder.statsum missing;
+  class orig_dte;
+  format orig_dte year.;
+  var co_cnt pur_cnt rt_cnt u_cnt;
+  tables (co_cnt='CASHOUT REFI' pur_cnt='PMM' rt_cnt='RATE/TERM REFI' 
+    u_cnt='UNKNOWN REFI')*sum='' n='sum', (orig_dte='' all);
+run;
+
+* building a tab with loan counts by occupancy type;
+ods tagsets.excelxp options(sheet_interval='none' sheet_name='vint.occ.counts');
+
+proc tabulate data=myfolder.statsum missing;
+  class orig_dte;
+  format orig_dte year.;
+  var inv_cnt pri_cnt sec_cnt;
+  tables (inv_cnt='INVESTOR' pri_cnt='PRIMARY RES' sec_cnt='SECOND HOME')*sum='' 
+    n='sum', (orig_dte='' all);
+run;
+
+* building a tab with frequencies by last status;
+ods tagsets.excelxp options(sheet_interval='none' 
+  sheet_name='vint.last_stat.counts');
+
+proc freq data=myfolder.statsum;
+  tables last_stat;
+run;
+
+*building summary statistics for credit score, oltv, and origination upb;
+ods tagsets.excelxp options(sheet_interval='none' sheet_name='summary.stats');
+
+proc means data=myfolder.statsum min p25 p50 mean p75 max nmiss;
+  var cscore_mn oltv orig_amt;
+run;
+
+* building a tab with counts by fico bucket and vintage;
+ods tagsets.excelxp options(sheet_interval='none' 
+  sheet_name='vint.fico.counts');
+
+proc tabulate data=myfolder.statsum missing;
+  class orig_dte cscorebkt;
+  format orig_dte year.;
+  var count;
+  table cscorebkt*count=''*sum='', (orig_dte='' all);
+run;
+
+* building the acquisition statistics tab of the excel document;
+ods tagsets.excelxp options(sheet_interval='none' sheet_name='aqsn. stats');
+
+proc tabulate data=myfolder.statsum missing;
+  class orig_dte;
+  format orig_dte year.;
+  var orig_amt;
+  var cscore_b cscore_c oltv ocltv dti orig_rt/weight=orig_amt;
+  table (orig_dte='' all), n='loan count' orig_amt='total orig. upb'*sum='' 
+    orig_amt='avg. orig upb($)'*mean cscore_b*mean='borrower credit score' 
+    cscore_c*mean='co-borrower credit score' oltv*mean='ltv ratio' 
+    ocltv*mean='cltv ratio' dti*mean='dti' orig_rt*mean='note rate';
+run;
+
+* building the performance statistics tab of the excel document to present loan counts, rates, and dollar amounts of different performance outcomes;
+ods tagsets.excelxp options(sheet_interval='none' 
+  sheet_name='perf.stat.counts');
+
+proc tabulate data=myfolder.statsum missing;
+  class orig_dte;
+  format orig_dte year.;
+  var orig_amt active_cnt active_upb prepaid_cnt reo_cnt alt_cnt repurch_cnt 
+    default_upb mod_flag;
+  var default_rt nloss_rt / weight=orig_amt;
+  table (orig_dte='' all), n='loan count' orig_amt='total orig. upb'*sum='' 
+    active_cnt='loan count (active)' 
+    active_upb='active upb' (prepaid_cnt='prepaid' repurch_cnt='repurchased' 
+    alt_cnt='alternative disposition' reo_cnt='reo disposition' 
+    mod_flag='modified') default_upb='default upb'*sum='' 
+    nloss_rt='net loss rate'*mean=''*f=percent10.5;
+run;
+
+* building the historical loss statistics tab of the excel document to present cost, proceed, and loss amounts by vintage;
+ods tagsets.excelxp options(sheet_interval='none' 
+  sheet_name='historical net loss by vintage');
+
+proc tabulate data=myfolder.statsum (where=(complt_flg=1)) missing;
+  class orig_dte;
+  format orig_dte year.;
+  var ar_cost1 ie_cost1 pp_cost1 fcc_cost1 tax_cost1 tot_exp1 tot_cost1 
+    int_cost1 tot_proc1 ns_procs1 ce_procs1 rmw_procs1 o_procs1 net_sev/ 
+    weight=default_upb;
+  var default_upb net_loss;
+  tables n='loan count'*f=comma10. default_upb='default upb ($m)'*sum='' (int_cost1='delinquent interest' 
+    tot_exp1='total liquidation exp.' fcc_cost1='foreclosure' 
+    pp_cost1='property preservation' ar_cost1='asset recovery' 
+    ie_cost1='misc. holding expenses' tax_cost1='associated taxes' 
+    tot_cost1='total costs' ns_procs1='net sales proceeds' 
+    ce_procs1='credit enhancement' rmw_procs1='repurchase/make whole' 
+    o_procs1='other proceeds' tot_proc1='total proceeds' 
+    net_sev='severity')*mean=''*f=percent10.5 
+    net_loss='total net loss ($m)'*sum='', (orig_dte='' all);
+run;
+
+proc tabulate data=myfolder.statsum missing;
+  class orig_dte;
+  format orig_dte year.;
+  var default_rt/ weight=orig_amt;
+  tables default_rt='default rate'*f=percent10.5*mean='', (orig_dte='' all);
+run;
+
+* building the historical loss statistics tab of the excel document to present cost, proceed, and loss amounts by vintage;
+ods tagsets.excelxp options(sheet_interval='none' 
+  sheet_name='historical net loss by disp dt');
+
+proc tabulate data=myfolder.statsum (where=(complt_flg=1)) missing;
+  class disp_dte;
+  format disp_dte year.;
+  var ar_cost1 ie_cost1 pp_cost1 fcc_cost1 tax_cost1 tot_exp1 tot_cost1 
+    int_cost1 tot_proc1 ns_procs1 ce_procs1 rmw_procs1 o_procs1 net_sev/ 
+    weight=default_upb;
+  var default_upb net_loss;
+  tables n='loan count'*f=comma10. default_upb='default upb'*sum=''
+
+(int_cost1='delinquent interest' tot_exp1='total liquidation exp.' 
+    fcc_cost1='foreclosure' pp_cost1='property preservation' 
+    ar_cost1='asset recovery' ie_cost1='misc. holding expenses' 
+    tax_cost1='associated taxes' tot_cost1='total costs' 
+    ns_procs1='net sales proceeds' ce_procs1='credit enhancement' 
+    rmw_procs1='repurchase/make whole' o_procs1='other proceeds' 
+    tot_proc1='total proceeds' net_sev='severity')*mean=''*f=percent10.5 
+    net_loss='total net loss'*sum='', (disp_dte='' all);
+run;
+
+proc tabulate data=myfolder.statsum missing;
+  class last_dte;
+  format last_dte year.;
+  var default_rt/ weight=orig_amt;
+  tables default_rt='default rate'*f=percent10.5*mean='', (last_dte='' all);
+run;
