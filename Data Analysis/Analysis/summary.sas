@@ -3,7 +3,7 @@
 
 %let _date = 2005Q1;
 %let d_comb = COMB.COMB_&_date;
-%let v_comb = orig_amt oltv ocltv cscore_b cscore_c dti last_rt last_upb Ar_cost;
+%let v_comb = orig_amt oltv cscore_b dti last_upb;
 
 options nodate;
 
@@ -16,6 +16,8 @@ proc contents data = &d_comb varnum;
   ods output Position = content;
 run;
 title;
+
+ods pdf close;
 
 /*
 ● Unpaid Balance (UPB)
