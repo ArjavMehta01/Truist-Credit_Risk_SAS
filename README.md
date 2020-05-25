@@ -8,6 +8,7 @@ Summer Project 2020 - Credit Risk Modelling
 * Data  
   + Acquisition
   + Performance
+  + Combine
 * Data Analysis
   + Import
     + importing.sas
