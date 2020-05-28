@@ -3,7 +3,7 @@
 
 
 * only extract one firm data;
-%let bank = BANK OF AMERICA;
+%let bank = WELLS FARGO BANK;
 
 * selected loan-level drivers;
 %let v_comb = ;
