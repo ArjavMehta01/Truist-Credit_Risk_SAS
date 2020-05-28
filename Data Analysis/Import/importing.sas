@@ -1,11 +1,18 @@
 /* Author: Jonas */
 /* Purpose: Import Loan performance data from LOCAL Path */
 
+
+* 1 means keep all data sets;
+* 0 means keep only the final data set;
+%let keep = 0;
+
+
+
 * change the value of this macro variable: Q1-Q4;
 %let quater = Q1;
 
-%let y_start = 2011;
-%let y_end = 2012;
+%let y_start = 2005;
+%let y_end = 2017;
 
 %let fn_end = 30SEP2018;
 
@@ -181,10 +188,10 @@
   run;
 
  *sorting loans by activity date to keep in chronological order;
-  proc sort data = &output..tmp TAGSORT;
-    by loan_id y_act_date;
-  run;
-  
+/*   proc sort data = &output..tmp TAGSORT; */
+/*     by loan_id y_act_date; */
+/*   run; */
+/*    */
   data &output..act_&date (drop   =  y_mod_ind          y_servicer             y_prev_upb      y_maturity_date_rt 
                                      y_maturity_date    y_rem_mths             y_non_int_upb   y_prin_forg_upb 
                                      y_prin_forg_upb_o  y_prin_forg_upb_fhfa   y_rem_mths_rt
@@ -528,6 +535,8 @@
       end;
   run;
 
+
+%if ^&keep %then %do;
   proc datasets library = ACQ nolist;
     delete acq_&date;
   run;
@@ -535,6 +544,7 @@
   proc datasets library = ACT nolist;
     delete act_&date;
   run;
+%end;
   
 %mend comb;
 
