@@ -1,13 +1,17 @@
 /* Author: Jonas */
 /* Purpose: Example of Statistics analysis on 2005Q1 data */
 
-%let _date = 2005Q1;
-%let d_comb = COMB.COMB_&_date;
+
+* change the value of this macro variable: Q1-Q4;
+%let quater = Q1;
+
+
+%let d_comb = DATA.combined_&quater;
 %let v_comb = orig_amt oltv cscore_b dti last_upb;
 
 options nodate;
 
-ods pdf file = "&p_data.Contents.pdf"
+ods pdf file = "&p_report.Contents.pdf"
         style = Sapphire;
 
 title "Content Table";
@@ -55,12 +59,12 @@ data tmp;
   if miss;
 run;
 
-ods pdf file = "&p_data.Summaries.pdf"
+ods pdf file = "&p_anly.Summaries.pdf"
         style = Sapphire
         startpage = never;
 options orientation = landscape;
 
-title "Statistics Summaries of &_date Data";
+title "Statistics Summaries of &quater data";
 
 proc means data = &d_comb
   min mean median mode max std range
