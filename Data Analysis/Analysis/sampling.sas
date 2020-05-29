@@ -1,44 +1,66 @@
 /* Author: Jonas */
-/* Purpose: Merge data sets for each quarter and generate the traning sample*/
-
-
-* only extract one firm data;
-%let bank = WELLS FARGO BANK;
-
-* selected loan-level drivers;
-%let v_comb = ;
+/* Purpose: Generate sample only select a portion of the data. */
+/* Seed: 7919 */
 
 * change the value of this macro variable: Q1-Q4;
 %let quater = Q1;
 
-%let y_start = 2005;
-%let y_end = 2017;
 
 
 
-* genrate the name of data sets;
+/*
 
-%let d_comb =;
-  
-%macro get_name();
-  %do i = &y_start %to &y_end;
-    %let d_comb = &d_comb COMB.comb_&i.&quater;
-  %end;
-%mend get_name;
+%let portion = 0.1;
+%let n_seed = 7919;
 
-%get_name();
-    
-%put Using data sets: &d_comb;
+* Read the acquisition data file, only keep the ID number;
+filename ACQid "&p_data/ACQ_ID.csv";
 
-
-* concatenate data sets;
-data DATA.combined_&quater;
-  set &d_comb;
-  where seller contains "&bank";
+data id_input;
+  infile ACQid dsd firstobs = 2;
+  input num id channel $ rate balance date1 $ date2 $ state $;
+  keep id;
 run;
 
 
+proc surveyselect data = id_input
+  outall
+  noprint
+  method = SRS 
+  out = id_sample (rename=(selected = train_flg))
+  rate = &portion
+  seed = &n_seed;
+run;
 
-/* proc freq data = COMB.comb_2012Q1; */
-/*   table seller; */
-/* run; */
+proc export data = id_sample 
+  outfile = "&p_data/ACQ_IDsample.csv"
+  dbms = csv;
+run;
+
+
+*/
+
+filename ACQid "&p_data/ACQ_IDsample.csv";
+
+data id_sample;
+  infile ACQid dsd firstobs = 2;
+  input tran_flg loan_id:$12.;
+run;
+
+proc sort data = id_sample;
+  by loan_id;
+run;
+
+proc sort data = DATA.combined_&quater tagsort;
+  by loan_id;
+run;
+
+
+data DATA.sample_&quater;
+  merge DATA.combined_&quater id_sample;
+  by loan_id;
+  if tran_flg & ^missing(dlq_stat);
+run;
+  
+
+

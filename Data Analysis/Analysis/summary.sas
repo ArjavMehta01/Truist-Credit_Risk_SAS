@@ -1,5 +1,5 @@
 /* Author: Jonas */
-/* Purpose: Example of Statistics analysis on 2005Q1 data */
+/* Purpose: Example of Statistics analysis on Q1 data */
 
 
 * change the value of this macro variable: Q1-Q4;
@@ -64,7 +64,7 @@ ods pdf file = "&p_anly.Summaries.pdf"
         startpage = never;
 options orientation = landscape;
 
-title "Statistics Summaries of &quater data";
+title "Statistics Summaries of &quater data (firm = &bank)";
 
 proc means data = &d_comb
   min mean median mode max std range
@@ -84,10 +84,14 @@ proc sql;
 quit;
 
 title2 "Frequencies of Last Status";
+footnote j=left "1 = 30 – 59 days; 2 = 60 – 89 days; Sequence continues thereafter for every 30 day period";
+footnote2 j=left "C = Current, or less than 30 days past due; F = Deed-in-Lieu, REO; L = Reperforming Loan Sale;
+ N = Note Sale; P = Prepaid or Matured; R = Repurchased; S = Short Sale; T = Third Party Sale; X = missing";
 proc freq data = &d_comb;
   tables last_stat;
 run;
 title;
+footnote;
 ods pdf close;
 
 
