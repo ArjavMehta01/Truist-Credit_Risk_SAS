@@ -3,7 +3,7 @@
 
 
 * only extract one firm data;
-%let bank = BANK OF AMERICA;
+%let bank = WELLS FARGO BANK;
 
 * selected loan-level drivers;
 %let v_comb = ;
@@ -11,7 +11,7 @@
 * change the value of this macro variable: Q1-Q4;
 %let quater = Q1;
 
-%let y_start = 2005;
+%let y_start = 2006;
 %let y_end = 2017;
 
 
@@ -38,7 +38,6 @@ data DATA.combined_&quater;
 run;
 
 
-
-/* proc freq data = COMB.comb_2012Q1; */
+/* proc freq data = ACQ.acq_2017Q1; */
 /*   table seller; */
 /* run; */

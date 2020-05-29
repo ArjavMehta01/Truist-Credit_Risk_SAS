@@ -17,7 +17,7 @@
   
   
 libname TRUIST_B "&p_local";
-  libname REPORT "p_report";
+  libname REPORT "&p_report";
   libname DATA "&p_data";
     libname ACQ "&p_acq";
     libname ACT "&p_perf";
