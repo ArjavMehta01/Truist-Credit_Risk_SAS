@@ -11,7 +11,7 @@
 * change the value of this macro variable: Q1-Q4;
 %let quater = Q1;
 
-%let y_start = 2005;
+%let y_start = 2006;
 %let y_end = 2017;
 
 %let fn_end = 30SEP2018;
@@ -164,9 +164,9 @@
   *****************************************;
   filename f_act "&p_perf";
   
-  data &output..tmp(drop = x_zb_date      x_period    x_maturity_date   x_adj_rem_months  
-                           x_dlq_status   x_lpi_dte   x_fcc_dte         x_disp_dte
-                   );
+  data &output..act&date(drop = x_zb_date      x_period    x_maturity_date   x_adj_rem_months  
+                                x_dlq_status   x_lpi_dte   x_fcc_dte         x_disp_dte
+                        );
     infile f_act("Performance_&date..txt") dlm = "|" missover dsd lrecl=32767 &option;
     
     input &perf_head;

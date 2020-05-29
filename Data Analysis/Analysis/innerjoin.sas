@@ -2,8 +2,7 @@
 /* Purpose: Merge data sets for each quarter and generate the traning sample*/
 
 
-* only extract one firm data;
-%let bank = WELLS FARGO BANK;
+
 
 * selected loan-level drivers;
 %let v_comb = ;
@@ -34,10 +33,7 @@
 * concatenate data sets;
 data DATA.combined_&quater;
   set &d_comb;
-  where seller contains "&bank";
+  drop seller;
 run;
 
 
-/* proc freq data = ACQ.acq_2017Q1; */
-/*   table seller; */
-/* run; */
