@@ -1,14 +1,6 @@
 /* Author: Jonas */
 /* Purpose: Example of Statistics analysis on Q1 data */
 
-
-* change the value of this macro variable: Q1-Q4;
-%let quater = Q1;
-
-
-%let d_comb = DATA.combined_&quater;
-%let v_comb = orig_amt oltv cscore_b dti last_upb;
-
 options nodate;
 
 ods pdf file = "&p_report.Contents.pdf"
@@ -23,41 +15,43 @@ title;
 
 ods pdf close;
 
-/*
-● Unpaid Balance (UPB)
-● LTV
-● Loan Age
-● Remaining Until Maturity
-● Interest Rate
-● Delinquency Status
-● Debt-to-Income (DTI)
-*/
 
-ods output MissingValues = miss_value;
-proc univariate data = &d_comb;
-  var &v_comb;
+* change the value of this macro variable: Q1-Q4;
+%let quater = Q1;
+
+
+%let d_comb = DATA.sample_&quater;
+%let v_comb = oltv dti cscore_b act_date orig_amt act_upb loan_age dlq_stat zb_code;
+
+
+* prepare data for calculating PD;
+data DATA.tmp;
+  set &d_comb;
+  label def_flg = "Default Flag";
+  if missing(dlq_stat) then delete;
+  else do;
+    if dlq_stat < 3 and (nmiss(zb_code) | zb_code in ("01" "06")) then def_flg = 0;
+    else def_flg = 1;
+  end;
+  keep &v_comb def_flg;
 run;
 
-data content(rename = (variable = varname));
-  set content(keep = variable label);
-run;
-
-proc sort data = content;
-  by varname;
-run;
 
 
-proc sort data = miss_value;
-  by varname;
+ods output CrossTabFreqs = tmp;
+proc freq data = DATA.tmp;
+  table act_date*def_flg;
 run;
 
-data tmp;
-  merge miss_value(keep = varname count countnobs
-                   in = miss)
-        content;
-  by varname;
-  if miss;
+data tmp(keep = act_date rowpercent);
+  set tmp;
+  if def_flg = 1 & _type_ = "11";
 run;
+
+proc sgscatter data = tmp;
+  compare X = act_date Y = rowpercent;
+run;
+
 
 ods pdf file = "&p_anly.Summaries.pdf"
         style = Sapphire
