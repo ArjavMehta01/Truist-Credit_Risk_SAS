@@ -12,10 +12,10 @@
 
 
 * change the value of this macro variable: Q1-Q4;
-%let quater = Q1;
+%let quater = Q2;
 
-%let y_start = 2017;
-%let y_end = 2006;
+%let y_start = 2006;
+%let y_end = 2017;
 
 
 %let acq_head = loan_id :$12.     orig_chn :$1.     seller :$80.
