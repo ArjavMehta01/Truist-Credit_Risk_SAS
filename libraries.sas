@@ -3,11 +3,11 @@
 
   
 
-%let p_local = /folders/myfolders/GitHub/Truist-Credit_Risk_SAS;
+%let p_local = /folders/myfolders/Git;
 
   
   
-%let p_anly = %sysfunc(cat(&p_local,/Data Analysis/));
+%let p_anly = %sysfunc(cat(&p_local,/Truist-Credit_Risk_SAS/Data Analysis/));
 %let p_report = %sysfunc(cat(&p_local,/Report/));
 
 %let p_data = %sysfunc(cat(&p_local,/Data/));
