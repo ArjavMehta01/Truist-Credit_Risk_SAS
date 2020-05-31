@@ -15,6 +15,9 @@
   %let p_perf = %sysfunc(cat(&p_local,/Data/Performance/));
   %let p_comb = %sysfunc(cat(&p_local,/Data/Combine/));
   
+%let p_pd = %sysfunc(cat(&p_local,/PD Model/));
+  %let p_pddata = %sysfunc(cat(&p_local,/PD Model/Data/));
+  
   
 libname TRUIST_B "&p_local";
   libname REPORT "&p_report";
@@ -22,6 +25,8 @@ libname TRUIST_B "&p_local";
     libname ACQ "&p_acq";
     libname ACT "&p_perf";
     libname COMB "&p_comb";
+  libname PD "&p_pd";
+    libname PD_DATA "&p_pddata";
 
 
 quit;

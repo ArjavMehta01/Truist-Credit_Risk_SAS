@@ -4,3 +4,4 @@
 *.sas7bdat
 .ipynb_checkpoints/libraries-checkpoint.sas
 Data/ACQ_ID.csv
+*.ppt
