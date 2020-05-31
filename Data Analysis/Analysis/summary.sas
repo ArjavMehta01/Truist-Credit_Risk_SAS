@@ -11,7 +11,11 @@ ods pdf file = "&p_data.Contents.pdf"
         style = Sapphire;
 
 title "Content Table";
+<<<<<<< Updated upstream
 proc contents data = &d_comb varnum;
+=======
+proc contents data = DATA.sample varnum;
+>>>>>>> Stashed changes
   ods select Position;
   ods output Position = content;
 run;
@@ -29,9 +33,35 @@ ods pdf close;
 ● Debt-to-Income (DTI)
 */
 
+<<<<<<< Updated upstream
 ods output MissingValues = miss_value;
 proc univariate data = &d_comb;
   var &v_comb;
+=======
+%let d_comb = DATA.sample;
+
+%let v_comb = loan_id oltv dti cscore_b act_date orig_amt act_upb loan_age dlq_stat zb_code;
+
+
+* prepare data for calculating PD;
+data DATA.tmp;
+  set &d_comb;
+  label def_flg = "Default Flag";
+  
+  if missing(dlq_stat) then delete;
+  else do;
+    if dlq_stat < 3 then def_flg = 0;
+    else if dlq_stat = 999 and (nmiss(zb_code) or zb_code in ("01" "06")) then def_flg = 0;
+    else def_flg = 1;
+  end;
+  
+  if missing(zb_code) and dlq_stat = 999 then delete;
+  keep &v_comb def_flg;
+run;
+
+proc sort data = DATA.tmp;
+  by loan_id descending def_flg;
+>>>>>>> Stashed changes
 run;
 
 data content(rename = (variable = varname));
@@ -55,7 +85,18 @@ data tmp;
   if miss;
 run;
 
+<<<<<<< Updated upstream
 ods pdf file = "&p_data.Summaries.pdf"
+=======
+
+proc datasets library = DATA nolist;
+  delete tmp;
+run;
+
+
+/*
+ods pdf file = "&p_anly.Summaries.pdf"
+>>>>>>> Stashed changes
         style = Sapphire
         startpage = never;
 options orientation = landscape;
