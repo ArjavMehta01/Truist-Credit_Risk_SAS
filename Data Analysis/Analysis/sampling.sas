@@ -62,4 +62,17 @@ data DATA.sample_&quater;
   if tran_flg & ^missing(dlq_stat);
 run;
   
+  
+  
+  
+
+
+* After getting all the sample dataset;
+
+data DATA.sample;
+  set DATA.sample_q1 DATA.sample_q2 DATA.sample_q3 DATA.sample_q4;
+run;
+  
+
+
 
