@@ -32,17 +32,57 @@ run;
 
 
 
+%put DATA PREPARATION;
 
+* Prepare the data: create a new status variable;
+data PD_DATA.data tmp_id(keep = loan_id curr_stat 
+                         rename = (loan_id = check_id curr_stat = Next_stat)
+                         );
+  set DATA.sample(drop = orig_rt orig_dte zb_date);
+  attrib Curr_stat length = $3.
+                   label = "Current State"
+                   ;
+                   
+  if dlq_stat = 0 then
+    Curr_stat = "CUR";
+  else if dlq_stat le 3 then
+    Curr_stat = "DEL";
+  else if dlq_stat = 999 and zb_code in ("01" "06") then
+    Curr_stat = "PPY";
+  else Curr_stat = "SDQ";
+run;
 
-%put DATA MERGING;
-
-* Merge the loan-level data with macros by date;
-
-proc sort data = DATA.sample(keep = ) out = PD_DATA.data;
-  by act_date;
+data PD_DATA.data(drop = check_id);
+  merge PD_DATA.data tmp_id(firstobs = 2);
+  attrib Next_stat length = $3.
+                   label = "Next State"
+                   ;
+  if loan_id ne check_id then next_stat = "";
 run;
 
 
+
+/*
+proc freq data = PD_DATA.data;
+  table dlq_stat*curr_stat;
+run;
+
+*/
+
+
+
+
+* Merge the loan-level data with macros by date;
+
+proc sort data = PD_DATA.data;
+  by act_date;
+run;
+
+data PD_DATA.data;
+  merge PD_DATA.data PD_DATA.macro;
+  by act_date;
+
+run;
 
 
 
@@ -78,7 +118,9 @@ proc freq data =data.sample;
 run;
     
     
-    
+proc freq data = data.sample;
+  table zb_code dlq_stat;
+    run;
     
     
     

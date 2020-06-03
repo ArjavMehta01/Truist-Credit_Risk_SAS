@@ -7,7 +7,7 @@ ods pdf file = "&p_report.Contents.pdf"
         style = Sapphire;
 
 title "Content Table";
-proc contents data = DATA.sample_Q1 varnum;
+proc contents data = DATA.sample varnum;
   ods select Position;
   ods output Position = content;
 run;
@@ -27,7 +27,6 @@ data DATA.tmp;
     else if dlq_stat = 999 and (nmiss(zb_code) or zb_code in ("01" "06")) then def_flg = 0;
     else def_flg = 1;
   end;
-  keep &v_comb def_flg;
 run;
 
 proc sort data = DATA.tmp;
@@ -70,10 +69,12 @@ ods powerpoint exclude all;
     keep &driver loan_id def_flg;
   run;
   
+  ods powerpoint exclude none;
   ods output CrossTabFreqs = tmp2;
   proc freq data = tmp;
     table &driver.*def_flg;
   run;
+  ods powerpoint exclude all;
   
   data tmp2(keep = &driver rowpercent);
     label rowpercent = "Probability of Default (%)";
