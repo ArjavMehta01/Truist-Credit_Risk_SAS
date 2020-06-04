@@ -143,7 +143,7 @@ run;
 ods powerpoint file = "&p_pdres/summary.ppt"
                style = Sapphire;
 
-ods graphics on / width=4in height=4in;
+ods graphics on / width=7in height=7in;
 
 options nodate;
 
@@ -219,16 +219,16 @@ proc sort data = PD_DATA.origin(where = (curr_stat in ("CUR" "DEL"))) out = _box
   by curr_stat;
 run;
 
+ods powerpoint exclude none;  
+
 title "Box Plot for Loan-level Drivers";
 proc boxplot data = _box;
   plot (oltv dti cscore_b)*curr_stat / boxstyle = schematic outbox = _outbox;
-  insetgroup min mean max/
-      header = 'Extremes by States'
-      pos = tm;
+  inset min mean max stddev/
+      header = 'Overall Statistics'
+      pos    = tm;
 run;
 title;
-
-
 
 ods select MissingValues;
 proc univariate data = PD_DATA.origin;
@@ -236,8 +236,29 @@ proc univariate data = PD_DATA.origin;
 run;
 
 
+title "Frequency table of outliers";
+proc freq data = _outbox;
+  table curr_stat*_var_*_type_ / nocol nopercent;
+  where _type_ in ("FARLOW" "LOW" "HIGH");
+run;
+title;
+
+ods powerpoint exclude all;
+
+/* proc means data = _outbox (where = (_type_ in ("FARLOW" "LOW") and _var_ in ("Oltv" "Cscore_b"))); */
+/*   var _value_; */
+/*   by _type_; */
+/* run; */
+
+
+ods powerpoint close;
+
+
+
+
 * Prepare for the scatter plot;
 
+/*
 data _tmp4;
   set PD_DATA.origin;
   by loan_id;
@@ -266,12 +287,9 @@ proc sgscatter data = _tmp6;
 run;
 title;
 
-title "Scatter Plots of PD by FICO";
-proc sgscatter data = _tmp6;
-  compare X = cscore_b Y = rowpercent / grid;
-  format cscore_b fico.;
-run;
-title;
+
+
+*/
 
 
 
@@ -279,9 +297,6 @@ title;
 
 
 
-
-
-ods powerpoint close;
 /* 
 proc sgscatter data = PD_DATA.del;
   matrix oltv dti cscore_b / diagonal = (histogram kernel);
