@@ -16,7 +16,7 @@
   
 %let p_pd = %sysfunc(cat(&p_local,/PD Model/));
   %let p_pddata = %sysfunc(cat(&p_local,/PD Model/Data/));
-  
+  %let p_pdres = %sysfunc(cat(&p_local,/PD Model/Result/));
   
 libname TRUIST_B "&p_local";
   libname REPORT "&p_report";

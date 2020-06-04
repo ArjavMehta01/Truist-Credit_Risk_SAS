@@ -3,6 +3,7 @@
 
 options nodate;
 
+/*
 ods pdf file = "&p_report.Contents.pdf"
         style = Sapphire;
 
@@ -15,7 +16,7 @@ title;
 
 ods pdf close;
 
-
+*/
 
 * prepare data for calculating PD;
 data DATA.tmp;
@@ -47,7 +48,7 @@ run;
 
 
 
-ods powerpoint file = "&p_report/scatter_plot.ppt"
+ods powerpoint file = "&p_report/_summary.ppt"
                style = Sapphire;
 
 ods graphics on / width=4in height=4in;
@@ -69,12 +70,12 @@ ods powerpoint exclude all;
     keep &driver loan_id def_flg;
   run;
   
-  ods powerpoint exclude none;
+
   ods output CrossTabFreqs = tmp2;
   proc freq data = tmp;
     table &driver.*def_flg;
   run;
-  ods powerpoint exclude all;
+
   
   data tmp2(keep = &driver rowpercent);
     label rowpercent = "Probability of Default (%)";
@@ -93,7 +94,7 @@ ods powerpoint exclude all;
   title "Univariate Analysis of &n_driver";
   proc univariate data = tmp;
   var &driver;
-  ods select Moments BasicMeasures;
+  ods select Moments BasicMeasures ExtremeObs MissingValues;
   run;
   title;
   
@@ -113,7 +114,7 @@ ods powerpoint close;
 
 
 proc datasets lib = DATA nolist;
-  delete DATA.tmp;
+  delete tmp;
 run;
 /*
 ods pdf file = "&p_anly.Summaries.pdf"
