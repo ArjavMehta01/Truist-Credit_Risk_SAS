@@ -53,7 +53,7 @@ run;
   
   
   * Prepare the data: create a new status variable;
-  data PD_DATA.origin tmp_id(keep = loan_id curr_stat 
+  data PD_DATA.loan tmp_id(keep = loan_id curr_stat 
                            rename = (loan_id = _id curr_stat = Next_stat)
                            );
     set PD_DATA.origin;
@@ -80,8 +80,8 @@ run;
     if _def then Curr_stat = "SDQ";
   run;
   
-  data PD_DATA.origin(drop = _:);
-    merge PD_DATA.origin tmp_id(firstobs = 2);
+  data PD_DATA.loan(drop = _:);
+    merge PD_DATA.loan tmp_id(firstobs = 2);
     attrib Next_stat length = $3.
                      label = "Next State"
                      ;
@@ -91,7 +91,7 @@ run;
   
   
   data _final(drop = curr_stat);
-    set PD_DATA.origin(keep = loan_id curr_stat);
+    set PD_DATA.loan(keep = loan_id curr_stat);
     by loan_id;
     attrib Final_stat length = $3.
                      label = "Final State"
@@ -106,7 +106,7 @@ run;
   * Grouping the FICO;
   
   data PD_DATA.loan;
-    merge PD_DATA.origin _final;
+    merge PD_DATA.loan _final;
     by loan_id;
     length fico $10;
     if 0 < cscore_b < 620 then
@@ -136,7 +136,7 @@ run;
 
 %mend prep;
 
-%prep()
+/* %prep() */
 
 %put ----------------------------------------------------------------- DATA SUMMARY;
 
@@ -413,30 +413,84 @@ run;
 
 %put ----------------------------------------------------------------- DATA MERGING;
 
+%let var = act_date loan_id
+           cltv dti cscore_b fico loan_age 
+           hs_mdt ump_mdt ppi_mdt tnf_mdt
+           next_stat;
+
 %macro merge();
   * Merge the loan-level data with macros by date;
   
-  proc sort data = DATA.macros(rename = (date = act_date)) out = PD_DATA.macros;
-    by act_date;
+  proc sort data = DATA.macros out = PD_DATA.macros;
+    by date;
   run;
   
-  proc sort data = PD_DATA.del out = del;
-    by act_date;
+  * Creat the orig_hpi for DEL;
+  proc sort data = PD_DATA.del out = _tmp1;
+    by orig_dte;
   run;
   
+  data _tmp1;
+    merge _tmp1 PD_DATA.macros(keep = date hpi rename = (date = orig_dte));
+    by orig_dte;
+    rename hpi = orig_hpi;
+  run;
+  
+  proc sort data = _tmp1;
+    by act_date;
+  run;
   
   data del;
-    merge del PD_DATA.macros;
+    merge _tmp1 PD_DATA.macros(rename = (date = act_date));
     by act_date;
+    
+    if missing(act_upb) then CLTV = oltv;
+      else CLTV = oltv*(hpi/orig_hpi)*(act_upb/orig_amt);
+      
     if ^missing(loan_id);
   run;
   
-  proc sort data = del;
+  proc sort data = del(keep = &var) out = PD_DATA.tmp;
     by loan_id act_date;
   run;
 
 
+
+  * Creat the orig_hpi for CUR;
+  proc sort data = PD_DATA.cur out = _tmp2;
+    by orig_dte;
+  run;
+  
+  data _tmp2;
+    merge _tmp2 PD_DATA.macros(keep = date hpi rename = (date = orig_dte));
+    by orig_dte;
+    rename hpi = orig_hpi;
+  run;
+  
+  proc sort data = _tmp2;
+    by act_date;
+  run;
+  
+  data cur;
+    merge _tmp2 PD_DATA.macros(rename = (date = act_date));
+    by act_date;
+    
+    if missing(act_upb) then CLTV = oltv;
+      else CLTV = oltv*(hpi/orig_hpi)*(act_upb/orig_amt);
+      
+    if ^missing(loan_id);
+  run;
+  
+  proc sort data = cur(keep = &var) out = PD_DATA.tmp2;
+    by loan_id act_date;
+  run;
+
 %mend merge;
+
+%merge();
+
+
+
 
 quit;
 
