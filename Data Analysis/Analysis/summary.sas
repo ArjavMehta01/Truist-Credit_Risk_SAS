@@ -42,7 +42,7 @@ run;
 
 data tmp(keep = act_date rowpercent);
   set tmp;
-  label rowpercent = "Probability of Default (%)";
+  label rowpercent = "Probability of Default(%)";
   if def_flg = 1 & _type_ = "11";
 run;
 
@@ -61,6 +61,7 @@ title;
 
 ods powerpoint exclude all;
 
+ods powerpoint close;
 %macro pd_scatter(driver, n_driver);
 
   data tmp;

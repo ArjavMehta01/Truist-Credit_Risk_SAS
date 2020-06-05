@@ -123,7 +123,7 @@ data PD_DATA.loan;
   if 780 <=cscore_b then
     fico = '[780+)';
   
-  drop dlq_stat zb_code cscore_b;
+  drop dlq_stat zb_code;
 run;
 
 
@@ -139,16 +139,20 @@ run;
 
 %put DATA SUMMARY;
 
+%macro summary();
+
 * ODS powerpoint output;
 ods powerpoint file = "&p_pdres/summary.ppt"
                style = Sapphire;
 
-ods graphics on / width=7in height=7in;
+ods graphics on / width=4in height=2in;
 
 options nodate;
 
 ods powerpoint exclude all;
 
+
+/*
 
 * Freq table: calculate the PD;
 ods output CrossTabFreqs = _freq1(keep = next_stat final_stat _type_ rowpercent
@@ -157,6 +161,7 @@ ods output CrossTabFreqs = _freq1(keep = next_stat final_stat _type_ rowpercent
 proc freq data = PD_DATA.cur;
   table Next_stat*final_stat;
 run;
+
 
 ods output CrossTabFreqs = _freq2(keep = next_stat final_stat _type_ rowpercent
                                   where = (_type_ = "11" and final_stat = "SDQ")
@@ -175,9 +180,29 @@ data _tmp1;
   by next_stat;
 run;
 
+*/
+
+* Historical Transition Rate;
+
+ods output OneWayFreqs = _freq1(keep = next_stat percent);
+proc freq data = PD_DATA.cur;
+  table Next_stat;
+run;
+
+ods output OneWayFreqs = _freq2(keep = next_stat percent);
+proc freq data = PD_DATA.del;
+  table Next_stat;
+run;
+
+data _tmp1;
+  merge _freq1(rename = (percent = CUR))
+        _freq2(rename = (percent = DEL));
+  by next_stat;
+run;
+
 proc transpose data = _tmp1
                prefix = stat
-               out = _tmp2(drop = _label_);
+               out = _tmp2;
 run;
 
 * Concatenate tables: data for bar chart;
@@ -185,15 +210,22 @@ data _tmp3;
   set _freq1(in = a) _freq2(in = b);
   if a then stat = "CUR";
   if b then stat = "DEL";
-  keep stat next_stat rowpercent;
+  keep stat next_stat percent;
+run;
+
+
+proc sort data = PD_DATA.origin(where = (curr_stat in ("CUR" "DEL"))
+                                keep = curr_stat oltv dti cscore_b) out = _box;
+  by curr_stat;
 run;
 
 
 ods powerpoint exclude none;
 
-title "Competing Risk Transition Matrix";
+title "Competing Risk Transition Matrix(%)";
+footnote "";
 proc report data = _tmp2;
-  columns _name_ ('Next State'(stat1 stat3 stat2 stat4));
+  columns _name_ ('Next State'(stat1 stat2 stat3 stat4));
   define _name_ / "Current State";
   define stat1 / "Current (CUR)";
   define stat2 / "Delinquent (DEL)";
@@ -204,7 +236,7 @@ title;
 
 title "Historical Transition Rate";
 proc sgplot data = _tmp3;
-  vbar next_stat/ response = rowpercent group = stat
+  vbar next_stat/ response = percent group = stat
                   groupdisplay = cluster nooutline;
   styleattrs datacolors = (cx9ecae1 cx3182bd);
   keylegend / title = "Current State";
@@ -213,38 +245,133 @@ proc sgplot data = _tmp3;
 run;
 title;
 
-ods powerpoint exclude all;     
-
-proc sort data = PD_DATA.origin(where = (curr_stat in ("CUR" "DEL"))) out = _box;
-  by curr_stat;
-run;
-
-ods powerpoint exclude none;  
+ods graphics on / width=3in height=4in;
 
 title "Box Plot for Loan-level Drivers";
 proc boxplot data = _box;
-  plot (oltv dti cscore_b)*curr_stat / boxstyle = schematic outbox = _outbox;
-  inset min mean max stddev/
+  plot (oltv dti cscore_b)*curr_stat / name = '' boxstyle = schematic 
+    outbox = _outbox(where = (_type_ in ("FARLOW" "LOW"))) ;
+  
+  inset min mean(5.0) max/
       header = 'Overall Statistics'
       pos    = tm;
 run;
 title;
 
-ods select MissingValues;
-proc univariate data = PD_DATA.origin;
-  var oltv dti cscore_b act_upb;
-run;
-
-
-title "Frequency table of outliers";
-proc freq data = _outbox;
-  table curr_stat*_var_*_type_ / nocol nopercent;
-  where _type_ in ("FARLOW" "LOW" "HIGH");
-run;
-title;
-
 ods powerpoint exclude all;
 
+ods output MissingValues = _misscur(keep = varname countnobs count);
+proc univariate data = PD_DATA.cur;
+  var oltv dti cscore_b;
+run;
+ods output MissingValues = _missdel(keep = varname countnobs count);
+proc univariate data = PD_DATA.del;
+  var oltv dti cscore_b;
+run;
+
+
+ods output CrossTabFreqs = _freq3(keep = curr_stat _var_ _type_ _type_2 frequency
+                                  where = (_type_2 = "111"));
+proc freq data = _outbox;
+  table curr_stat*_var_*_type_ / nocol nopercent;
+run;
+
+
+data _null_;
+  if 0 then set PD_DATA.cur(keep = loan_id) nobs = n;
+  call symputx('ncur', n);
+  stop;
+run;
+
+data _null_;
+  if 0 then set PD_DATA.del(keep = loan_id) nobs = n;
+  call symputx('ndel', n);
+  stop;
+run;
+
+data _missadd;
+  input Curr_stat $ varname $ _Type_ $ count;
+  datalines;
+  CUR Oltv MISSING 0
+  DEL Oltv MISSING 0
+  ;
+run;
+
+data _miss;
+  set _misscur(in = a) _missdel(in = b) _missadd;
+  _type_ = "MISSING";
+  if a then curr_stat = "CUR";
+  if b then curr_stat = "DEL";
+run;
+
+data _tmp1;
+  set _freq3(drop = _type_2) _miss(rename = (varname = _var_ count = frequency) drop = countnobs);
+  format cntout percent9.4;
+  if curr_stat = "CUR" then cntout = frequency/&ncur;
+  if curr_stat = "DEL" then cntout = frequency/&ndel;
+  freq = trim(left(put(frequency,8.))) || " " || "(" || trim(left(put(cntout,percent9.4))) || ")";
+  drop frequency cntout;
+run;
+
+proc sort data = _tmp1;
+  by curr_stat _var_ _type_;
+run;
+
+proc transpose data = _tmp1(where = (curr_stat = "CUR")) out = _tbcur(drop = _name_);
+  id _type_;
+  by _var_;
+  var freq;
+run;
+
+proc transpose data = _tmp1(where = (curr_stat = "DEL")) out = _tbdel(drop = _name_);
+  id _type_;
+  by _var_;
+  var freq;
+run;
+
+data _tbcur;
+  set _tbcur;
+  select (_var_);
+    when("Cscore_b") _var = "FICO";
+    when("Dti") _var = "DTI";
+    when("Oltv") _var = "OLTV";
+  end;
+  drop = _var_;
+run;
+
+data _tbdel;
+  set _tbdel;
+  select (_var_);
+    when("Cscore_b") _var = "FICO";
+    when("Dti") _var = "DTI";
+    when("Oltv") _var = "OLTV";
+  end;
+  drop = _var_;
+run;
+
+
+ods powerpoint exclude none;
+
+title "Frequency Table of Outliers and Missing Value";
+footnote j=l "Current State = CUR";
+proc report data = _tbcur;
+  columns _var ("Outlier" (low farlow)) missing;
+  define _var / "Variable";
+  define low / "Low";
+  define farlow / "Low Far";
+  define missing / "Missing Value";
+run;
+footnote j=l "Current State = DEL";
+proc report data = _tbdel;
+  columns _var ("Outlier" (low farlow)) missing;
+  define _var / "Variable";
+  define low / "Low";
+  define farlow / "Low Far";
+  define missing / "Missing Value";
+run;
+title;
+footnote;
+ods powerpoint exclude all;
 /* proc means data = _outbox (where = (_type_ in ("FARLOW" "LOW") and _var_ in ("Oltv" "Cscore_b"))); */
 /*   var _value_; */
 /*   by _type_; */
@@ -253,7 +380,9 @@ ods powerpoint exclude all;
 
 ods powerpoint close;
 
+%mend summary;
 
+*%summary();
 
 
 * Prepare for the scatter plot;
@@ -304,10 +433,8 @@ run;
  */
 
 
-
-/*
 %put FORMAT;
-
+/*
 proc format lib = PD_DATA;
   value fico low -< 620 = '[0-620)'
              620 -< 660 = '[620-660)'
