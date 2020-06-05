@@ -8,48 +8,51 @@ Macroeconomic Variables Analysis */
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id01;
   filename url_file url "&_url";
   
-  data Housing_Starts ( drop = lagvar1 lagvar12 ) ;
+  data Housing_Starts ( drop = lagvar1 lagvar12 chardate ) ;
     infile url_file  missover dsd firstobs=2;
-    input date :$10. HousingSt_Var;
+    input chardate :$10. HousingSt_Var;
+    date = input(chardate,yymmdd10.);
     label
     HousingSt_Var = "Housing Starts"
-  	logP = "Log Transformation"
-  	MGT = "Monthly Growth Transformation"
-  	AGT = "Annual Growth Transformation"
-  	MRT = "Monthly Return Transformation"
-  	ART = "Annual Return Transformation"
-  	MDT = "Monthly Difference Transformation"
-  	Percent_Change = "Percetnage Change"
-  	AG = "Annual Growth in Percent"
+  	logP_HS = "Log Transformation"
+  	MGT_HS = "Monthly Growth Transformation"
+  	AGT_HS = "Annual Growth Transformation"
+  	MRT_HS = "Monthly Return Transformation"
+  	ART_HS = "Annual Return Transformation"
+  	MDT_HS = "Monthly Difference Transformation"
+  	Percent_Change_HS = "Percetnage Change"
+  	AG_HS = "Annual Growth in Percent"
   	;
-  	format logP MGT AGT MRT ART MDT comma10.5 Percent_Change AG percent10.2;
+  	format logP_HS MGT_HS AGT_HS MRT_HS ART_HS MDT_HS comma10.5 Percent_Change_HS AG_HS percent10.2 date mmddyy10.;
   	lagvar1 = lag(HousingSt_Var) ;
   	lagvar12 = lag12(HousingSt_Var);
-  	logP = log(HousingSt_Var); /*Log transformation*/
-  	MGT = log ( HousingSt_Var / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
-  	AGT = log ( HousingSt_Var / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
-  	MRT = ( HousingSt_Var / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
-  	ART = ( HousingSt_Var / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
-  	MDT = dif(lag(HousingSt_Var)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
-  	Percent_Change = ( ( HousingSt_Var / lag( HousingSt_Var ) ) ** 12 - 1 ) * 100;
-  	AG = dif12( HousingSt_Var ) / lag12( HousingSt_Var ) * 100; /*computed percent change from the same period in the previous year*/
+  	logP_HS = log(HousingSt_Var); /*Log transformation*/
+  	MGT_HS = log ( HousingSt_Var / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
+  	AGT_HS = log ( HousingSt_Var / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
+  	MRT_HS = ( HousingSt_Var / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
+  	ART_HS = ( HousingSt_Var / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
+  	MDT_HS = dif(lag(HousingSt_Var)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
+  	Percent_Change_HS = ( ( HousingSt_Var / lag( HousingSt_Var ) ) ** 12 - 1 ) * 100;
+  	AG_HS = dif12( HousingSt_Var ) / lag12( HousingSt_Var ) * 100; /*computed percent change from the same period in the previous year*/
   run;
   
-  proc print data = Housing_Starts;
-  run;
   
-proc univariate data = Housing_Starts normal  ; 
-histogram HousingSt_Var / normal;
-run;
+  proc print data = Housing_Starts label;
+  run;
+ 
 
-title "Statistics for Housing Starts";
-proc means data = Housing_Starts
-  min mean median mode max std range
-  maxdec = 0
-  nmiss;
-  var HousingSt_Var;
+/*   Univariate analysis for various variables */
+title "Univariate Analysis for Housing Starts";
+proc univariate data = Housing_Starts plot normaltest  ; 
+var HousingSt_Var MRT_HS;
+histogram / normal;
+inset mean median skewness/position = ne;
 run;
 title;
+
+
+
+
 
 /* US GDP (Quarterly) */
 
@@ -57,36 +60,42 @@ title;
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id02;
   filename url_file url "&_url";
   
-  data GDP (drop = lagvar1 lagvar4 );
+  data GDP (drop = chardate lagvar1 lagvar4 );
   	infile url_file missover dsd;
-  	input date :$10. GDP_Var;
+  	input chardate :$10. GDP_Var;
+  	date = input(chardate,yymmdd10.);
   	label 
   	GDP_Var = "US GDP"
-  	logP = "Log Transformation"
-  	QGT = "Quarterly Growth Transformation"
-  	AGT = "Annual Growth Transformation"
-  	QRT = "Quarterly Return Transformation"
-  	ART = "Annual Return Transformation"
-  	QDT = "Quarterly Difference Transformation"
-  	pctchng = "Percetnage Change"
-  	AG = "Annual Growth in Percent"
+  	logP_GDP = "Log Transformation"
+  	QGT_GDP = "Quarterly Growth Transformation"
+  	AGT_GDP = "Annual Growth Transformation"
+  	QRT_GDP = "Quarterly Return Transformation"
+  	ART_GDP = "Annual Return Transformation"
+  	QDT_GDP = "Quarterly Difference Transformation"
+  	pctchng_GDP = "Percetnage Change"
+  	AG_GDP = "Annual Growth in Percent"
   	;
-  	format logP QGT AGT QRT ART QDT comma10.5 pctchng AG percent10.2;
+  	format logP_GDP QGT_GDP AGT_GDP QRT_GDP ART_GDP QDT_GDP comma10.5 pctchng_GDP AG_GDP percent10.2 date mmddyy10.;
   	lagvar1 = lag(GDP_Var) ;
   	lagvar4 = lag4(GDP_Var);
-  	logP = log(GDP_Var); /*Log transformation*/
-  	QGT = log ( GDP_Var / lagvar1 ); /*Quarterly Growth Transformation ( ln(Xt / Xt-1) )*/ 
-  	AGT = log ( GDP_Var / lagvar4 ); /*Annual Growth Transformation ( ln(Xt / Xt-4) ) */
-  	QRT = ( GDP_Var / lagvar1 ) ;/* Quarterly Return Transformation ( Xt / Xt-1 ) */
-  	ART = ( GDP_Var / lagvar1 ) ;/* Annual Return Transformation (Xt / Xt-4 ) */
-  	QDT = dif(lag(GDP_Var)); /* Quarterly Difference Transformation ( Xt - Xt-1 ) */	
-  	pctchng = ( ( GDP_Var / lag( GDP_Var ) ) ** 12 - 1 ) * 100;
-  	AG = dif4( GDP_Var ) / lag4( GDP_Var ) * 100; /*computed percent change from the same period in the previous year*/
+  	logP_GDP = log(GDP_Var); /*Log transformation*/
+  	QGT_GDP = log ( GDP_Var / lagvar1 ); /*Quarterly Growth Transformation ( ln(Xt / Xt-1) )*/ 
+  	AGT_GDP = log ( GDP_Var / lagvar4 ); /*Annual Growth Transformation ( ln(Xt / Xt-4) ) */
+  	QRT_GDP= ( GDP_Var / lagvar1 ) ;/* Quarterly Return Transformation ( Xt / Xt-1 ) */
+  	ART_GDP = ( GDP_Var / lagvar1 ) ;/* Annual Return Transformation (Xt / Xt-4 ) */
+  	QDT_GDP = dif(lag(GDP_Var)); /* Quarterly Difference Transformation ( Xt - Xt-1 ) */	
+  	pctchng_GDP = ( ( GDP_Var / lag( GDP_Var ) ) ** 12 - 1 ) * 100;
+  	AG_GDP = dif4( GDP_Var ) / lag4( GDP_Var ) * 100; /*computed percent change from the same period in the previous year*/
   run;
   
-  proc print data = GDP;
-  run;
-  
+/*   Univariate Analysis for GDP */
+title "Univariate Analysis for GDP";
+proc univariate data = GDP plot normaltest  ; 
+var logP_GDP AG_GDP QDT_GDP QGT_GDP;
+histogram / normal;
+inset mean median skewness/position = ne;
+run;
+title;
 
 
 /* Unemployment (Monthly) */
@@ -95,37 +104,45 @@ title;
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id03;
   filename url_file url "&_url";
   
-  data Unemployment;
+  data Unemployment (Drop = chardate lagvar1 lagvar12);
   	infile url_file missover dsd;
-  	input date:$10. Unemp_Var;
+  	input chardate:$10. Unemp_Var;
+  	date = input(chardate,yymmdd10.);
   	label
-  	logP = "Log Transformation"
-  	MGT = "Monthly Growth Transformation"
-  	AGT = "Annual Growth Transformation"
-  	MRT = "Monthly Return Transformation"
-  	ART = "Annual Return Transformation"
-  	MDT = "Monthly Difference Transformation"
-  	pctchng = "Percetnage Change"
-  	AG = "Annual Growth in Percent"
+  	logP_UMP = "Log Transformation"
+  	MGT_UMP = "Monthly Growth Transformation"
+  	AGT_UMP = "Annual Growth Transformation"
+  	MRT_UMP = "Monthly Return Transformation"
+  	ART_UMP = "Annual Return Transformation"
+  	MDT_UMP = "Monthly Difference Transformation"
+  	pctchng_UMP = "Percetnage Change"
+  	AG_UMP = "Annual Growth in Percent"
   	;
-  	format logP MGT AGT MRT ART MDT comma10.5 pctchng AG percentN10.2 ;
+  	format logP_UMP MGT_UMP AGT_UMP MRT_UMP ART_UMP MDT_UMP comma10.5 pctchng_UMP AG_UMP percentN10.2 date ddmmyy10. ;
   	lagvar1 = lag(Unemp_Var) ;
   	lagvar12 = lag12(Unemp_Var);
-  	logP = log(Unemp_Var); /*Log transformation*/
-  	MGT = log ( Unemp_Var / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
-  	AGT = log ( Unemp_Var / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
-  	MRT = ( Unemp_Var / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
-  	ART = ( Unemp_Var / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
-  	MDT = dif(lag(Unemp_Var)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
-  	pctchng = ( ( Unemp_Var / lag( Unemp_Var ) ) ** 12 - 1 ) * 100;
-  	AG = dif12( Unemp_Var ) / lag12( Unemp_Var ) * 100; /*computed percent change from the same period in the previous year*/
+  	logP_UMP = log(Unemp_Var); /*Log transformation*/
+  	MGT_UMP = log ( Unemp_Var / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
+  	AGT_UMP = log ( Unemp_Var / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
+  	MRT_UMP = ( Unemp_Var / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
+  	ART_UMP = ( Unemp_Var / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
+  	MDT_UMP = dif(lag(Unemp_Var)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
+  	pctchng_UMP = ( ( Unemp_Var / lag( Unemp_Var ) ) ** 12 - 1 ) * 100;
+  	AG_UMP = dif12( Unemp_Var ) / lag12( Unemp_Var ) * 100; /*computed percent change from the same period in the previous year*/
   run;
   
-  proc contents data = Unemployment;
-  run;
-  
+/*   Univariate Analysis for Unemployment */
+title "Univariate Analysis for Unemployment";
+proc univariate data = Unemployment plot normaltest  ; 
+var Unemp_Var MRT_UMP;
+histogram / normal;
+inset mean median skewness/position = ne;
+run;
+title;
+
+
  proc sgscatter data=Unemployment;
- matrix Unemp_var MGT AGT / diagonal=(histogram normal);
+ matrix Unemp_var MGT_UMP AGT_UMP / diagonal=(histogram normal);
  run;
   
    title "Scatter Plots";
@@ -134,12 +151,71 @@ title;
   run;
   title;
   
-  title "Univariate Analysis of &n_driver";
-  proc univariate data = tmp;
-  var &driver;
-  ods select Moments BasicMeasures;
-  run;
-  title;
+
+  
+  
+  
+/*   ####################### */
+/*   MERGING UNEMP AND HOUSING STARTS */
+
+
+data merged_Data  (where = (date between '01Jan2005'd and '01Jan2016'd) );
+   set Housing_Starts;
+   set Unemployment;
+   set ProducerPI;
+   set Permits;
+   set TNFPayrolls;
+run;
+
+proc print data = merged_Data label;
+run;
+
+proc export 
+  data=merged_Data
+  dbms=xlsx 
+  outfile="D:\SASUniversityEdition\myfolders\Truist-Credit_Risk_SAS\Macros.xlsx" 
+  replace;
+run;
+
+proc sgscatter data = merged_Data;
+  compare X = HousingSt_Var Y = Unemp_Var / grid;
+run;
+
+/* Plot of two variables to see their trends */
+proc sgplot data=merged_Data;
+series x = date y = Permits / lineattrs = (color = red thickness = 1
+ pattern=solid);
+series x = date y = HousingSt_Var / lineattrs = (color = green thickness = 1
+ pattern=solid) Y2AXIS;
+xaxis label = 'Date' values=("01JAN06"d to "01JAN18"d by month) grid;
+yaxis label = 'Housing Starts' grid ;
+y2axis label = 'Permits' grid ;
+run;
+
+
+/* proc gplot data = merged_Data; */
+/* plot HousingSt_Var Unemp_Var; */
+/* run; */
+
+/*  */
+/* proc corr spearman data = merged_Data; */
+/* var HousingSt_Var Unemp_Var; */
+/* run; */
+
+proc corr data = merged_Data pearson nosimple plots = matrix (histogram) rank nosimple;
+	var Unemp_Var logP_UMP MGT_UMP AGT_UMP MRT_UMP ART_UMP MDT_UMP ;
+	with HousingSt_Var logP_HS MGT_HS AGT_HS MRT_HS ART_HS MDT_HS ;	
+	run;
+	
+proc freq data = Merged_data;
+table MRT_HS*MRT_UMP / nocol norow nopercent expected
+chisq;
+run;
+
+
+
+
+  
   
 /*   Mortgage Rates (Weekly) */
   
@@ -149,44 +225,58 @@ title;
   
   data MortgageRate30;
   	infile url_file missover dsd;
-  	input date :$10. Rates;
+  	input chardate :$10. Rates;
+  	date = input(chardate,yymmdd10.);
   run;
   
+/*   Univariate Analysis for Mortgage Rates */
+
+title "Univariate Analysis for Mortgage Rates";
+proc univariate data = MortgageRate30 plot normaltest  ; 
+var Rates;
+histogram / normal;
+inset mean median skewness/position = ne;
+run;
+title;
   
 /*   Total Non-farm Payrolls (Monthly) */
   %let id05 = %nrstr(1iDdiHWP7ihEtEh1zED3XQup0ksdNmK_J);
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id05;
   filename url_file url "&_url";
   
-  data TNFPayrolls ( drop = lagvar1   lagvar12 );
+  data TNFPayrolls ( drop =chardate lagvar1   lagvar12 );
   	infile url_file missover dsd;
-  	input date :$10. Payrolls;
+  	input chardate :$10. Payrolls;
+  	date = input(chardate,yymmdd10.);
     label
-  	logP = "Log Transformation"
-  	MGT = "Monthly Growth Transformation"
-  	AGT = "Annual Growth Transformation"
-  	MRT = "Monthly Return Transformation"
-  	ART = "Annual Return Transformation"
-  	MDT = "Monthly Difference Transformation"
-  	pctchng = "Percetnage Change"
-  	AG = "Annual Growth in Percent"
+  	logP_TNF = "Log Transformation"
+  	MGT_TNF = "Monthly Growth Transformation"
+  	AGT_TNF = "Annual Growth Transformation"
+  	MRT_TNF = "Monthly Return Transformation"
+  	ART_TNF = "Annual Return Transformation"
+  	MDT_TNF = "Monthly Difference Transformation"
+  	pctchng_TNF = "Percetnage Change"
+  	AG_TNF = "Annual Growth in Percent"
   	;
-  	format logP MGT AGT MRT ART MDT comma10.5 pctchng AG percent10.2;
+  	format logP_TNF MGT_TNF AGT_TNF MRT_TNF ART_TNF MDT_TNF comma10.5 pctchng_TNF AG_TNF percent10.2 date ddmmyy10.;
   	lagvar1 = lag(Payrolls) ;
   	lagvar12 = lag12(Payrolls);
-  	logP = log(Payrolls); /*Log transformation*/
-  	MGT = log ( Payrolls / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
-  	AGT = log ( Payrolls / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
-  	MRT = ( Payrolls / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
-  	ART = ( Payrolls / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
-  	MDT = dif(lag(Payrolls)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
-  	pctchng = ( ( Payrolls / lag( Payrolls ) ) ** 12 - 1 ) * 100;
-  	AG = dif12( Payrolls ) / lag12( Payrolls ) * 100; /*computed percent change from the same period in the previous year*/
+  	logP_TNF = log(Payrolls); /*Log transformation*/
+  	MGT_TNF = log ( Payrolls / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
+  	AGT_TNF = log ( Payrolls / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
+  	MRT_TNF = ( Payrolls / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
+  	ART_TNF = ( Payrolls / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
+  	MDT_TNF = dif(lag(Payrolls)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
+  	pctchng_TNF = ( ( Payrolls / lag( Payrolls ) ) ** 12 - 1 ) * 100;
+  	AG_TNF = dif12( Payrolls ) / lag12( Payrolls ) * 100; /*computed percent change from the same period in the previous year*/
   run;
   
+
+/*   Univariate Analysis for Total Non-Farm Payrolls */
   
-proc univariate data = TNFPayrolls normal  ; 
-histogram pctchng / normal;
+proc univariate data = TNFPayrolls normaltest  ; 
+histogram Payrolls MRT_TNF / normal;
+inset mean median skewness;
 run;
 
 proc means data = TNFPayrolls
@@ -210,6 +300,15 @@ run;
   	input date :$10. Fed_Rate;
   run;
   
+title "Univariate Analysis for Fed Rates";
+proc univariate data = FedFundsR plot normaltest  ; 
+var Fed_Rate;
+histogram / normal;
+inset mean median skewness/position = ne;
+run;
+title;
+  
+  
   
 /*   Housing Permits (Monthly) */
   
@@ -217,31 +316,41 @@ run;
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id07;
   filename url_file url "&_url";
   
-  data Permits;
+  data Permits ( drop = chardate lagvar1 lagvar12);
   	infile url_file missover dsd;
-  	input date :$10. Permits;
+  	input chardate :$10. Permits;
+    date = input(chardate,yymmdd10.);	
   	label
-  	logP = "Log Transformation"
-  	MGT = "Monthly Growth Transformation"
-  	AGT = "Annual Growth Transformation"
-  	MRT = "Monthly Return Transformation"
-  	ART = "Annual Return Transformation"
-  	MDT = "Monthly Difference Transformation"
-  	pctchng = "Percetnage Change"
-  	AG = "Annual Growth in Percent"
+  	logP_HOP = "Log Transformation"
+  	MGT_HOP = "Monthly Growth Transformation"
+  	AGT_HOP = "Annual Growth Transformation"
+  	MRT_HOP = "Monthly Return Transformation"
+  	ART_HOP = "Annual Return Transformation"
+  	MDT_HOP = "Monthly Difference Transformation"
+  	pctchng_HOP = "Percetnage Change"
+  	AG_HOP = "Annual Growth in Percent"
   	;
-  	format logP MGT AGT MRT ART MDT comma10.5 pctchng AG percent10.2;
+  	format log_HOP MGT_HOP AGT_HOP MRT_HOP ART_HOP MDT_HOP comma10.5 pctchng_HOP AG_HOP percent10.2 date ddmmyy10.;
   	lagvar1 = lag(Permits) ;
   	lagvar12 = lag12(Permits);
-  	logP = log(Permits); /*Log transformation*/
-  	MGT = log ( Permits / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
-  	AGT = log ( Permits / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
-  	MRT = ( Permits / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
-  	ART = ( Permits / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
-  	MDT = dif(lag(Permits)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
-  	pctchng = ( ( Permits / lag( Permits ) ) ** 12 - 1 ) * 100;
-  	AG = dif12( Permits ) / lag12( Permits ) * 100; /*computed percent change from the same period in the previous year*/
+  	logP_HOP = log(Permits); /*Log transformation*/
+  	MGT_HOP = log ( Permits / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
+  	AGT_HOP = log ( Permits / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
+  	MRT_HOP = ( Permits / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
+  	ART_HOP = ( Permits / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
+  	MDT_HOP = dif(lag(Permits)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
+  	pctchng_HOP = ( ( Permits / lag( Permits ) ) ** 12 - 1 ) * 100;
+  	AG_HOP = dif12( Permits ) / lag12( Permits ) * 100; /*computed percent change from the same period in the previous year*/
   run;
+  
+title "Univariate Analysis for Housing Permits ";
+proc univariate data =Permits  plot normaltest  ; 
+var Permits MRT_HOP ;
+histogram / normal;
+inset mean median skewness/position = ne;
+run;
+title;
+  
   
   
 /*   Producer Price Index (Monthly) */
@@ -250,33 +359,41 @@ run;
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id08;
   filename url_file url "&_url";
   
-  data ProducerPI(drop = lagvar1 lagvar12);
+  data ProducerPI(drop = chardate lagvar1 lagvar12);
   	infile url_file missover dsd firstobs=2;
-  	input date :$10. PPI_Var;
+  	input chardate :$10. PPI_Var;
+  	date = input(chardate,yymmdd10.);
   	label
-  	logP = "Log Transformation"
-  	MGT = "Monthly Growth Transformation"
-  	AGT = "Annual Growth Transformation"
-  	MRT = "Monthly Return Transformation"
-  	ART = "Annual Return Transformation"
-  	MDT = "Monthly Difference Transformation"
-  	pctchng = "Percetnage Change"
-  	AG = "Annual Growth in Percent"
+  	logP_PPI = "Log Transformation"
+  	MGT_PPI = "Monthly Growth Transformation"
+  	AGT_PPI = "Annual Growth Transformation"
+  	MRT_PPI = "Monthly Return Transformation"
+  	ART_PPI = "Annual Return Transformation"
+  	MDT_PPI = "Monthly Difference Transformation"
+  	pctchng_PPI = "Percetnage Change"
+  	AG_PPI = "Annual Growth in Percent"
   	;
-  	format logP MGT AGT MRT ART MDT comma10.5 pctchng AG percent10.2;
+  	format logP_PPI MGT_PPI AGT_PPI MRT_PPI ART_PPI MDT_PPI comma10.5 pctchng_PPI AG_PPI percent10.2 date ddmmyy10.;
   	lagvar1 = lag(PPI_Var) ;
   	lagvar12 = lag12(PPI_Var);
-  	logP = log(PPI_Var); /*Log transformation*/
-  	MGT = log ( PPI_Var / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
-  	AGT = log ( PPI_Var / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
-  	MRT = ( PPI_Var / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
-  	ART = ( PPI_Var / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
-  	MDT = dif(lag(PPI_Var)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
-  	pctchng = ( ( PPI_Var / lag( PPI_Var ) ) ** 12 - 1 ) * 100;
-  	AG = dif12( PPI_Var ) / lag12( PPI_Var ) * 100; /*computed percent change from the same period in the previous year*/
+  	logP_PPI = log(PPI_Var); /*Log transformation*/
+  	MGT_PPI = log ( PPI_Var / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
+  	AGT_PPI = log ( PPI_Var / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
+  	MRT_PPI = ( PPI_Var / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
+  	ART_PPI = ( PPI_Var / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
+  	MDT_PPI = dif(lag(PPI_Var)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
+  	pctchng_PPI = ( ( PPI_Var / lag( PPI_Var ) ) ** 12 - 1 ) * 100;
+  	AG_PPI = dif12( PPI_Var ) / lag12( PPI_Var ) * 100; /*computed percent change from the same period in the previous year*/
   run;
  
- 
+ title "Univariate Analysis for Producer Price Index";
+proc univariate data = ProducerPI plot normaltest  ; 
+var PPI_Var MRT_PPI;
+histogram / normal;
+inset mean median skewness/position = ne;
+run;
+title;
+  
  
 /* Consumer Price Index (Monthly) */
 
@@ -284,40 +401,89 @@ run;
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id09;
   filename url_file url "&_url";
   
-  data ConsumerPI;
+  data ConsumerPI ( drop = charadate lagvar1 lagvar12);
   	infile url_file missover dsd firstobs=2;
-  	input date :$10. CPI_Var;
+  	input chardate :$10. CPI_Var;
+    date = input(chardate,yymmdd10.);
   	label
-  	logP = "Log Transformation"
-  	MGT = "Monthly Growth Transformation"
-  	AGT = "Annual Growth Transformation"
-  	MRT = "Monthly Return Transformation"
-  	ART = "Annual Return Transformation"
-  	MDT = "Monthly Difference Transformation"
-  	pctchng = "Percetnage Change"
-  	AG = "Annual Growth in Percent"
+  	logP_CPI = "Log Transformation"
+  	MGT_CPI = "Monthly Growth Transformation"
+  	AGT_CPI = "Annual Growth Transformation"
+  	MRT_CPI = "Monthly Return Transformation"
+  	ART_CPI = "Annual Return Transformation"
+  	MDT_CPI = "Monthly Difference Transformation"
+  	pctchng_CPI = "Percetnage Change"
+  	AG_CPI = "Annual Growth in Percent"
   	;
-  	format logP MGT AGT MRT ART MDT comma10.5 pctchng AG percent10.2;
+  	format logP_CPI MGT_CPI AGT_CPI MRT_CPI ART_CPI MDT_CPI comma10.5 pctchng_CPI AG_CPI percent10.2 date ddmmyy10.;
   	lagvar1 = lag(CPI_Var) ;
   	lagvar12 = lag12(CPI_Var);
-  	logP = log(CPI_Var); /*Log transformation*/
-  	MGT = log ( CPI_Var / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
-  	AGT = log ( CPI_Var / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
-  	MRT = ( CPI_Var / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
-  	ART = ( CPI_Var / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
-  	MDT = dif(lag(CPI_Var)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
-  	pctchng = ( ( CPI_Var / lag( CPI_Var ) ) ** 12 - 1 ) * 100;
-  	AG = dif12( CPI_Var ) / lag12( CPI_Var ) * 100; /*computed percent change from the same period in the previous year*/
+  	logP_CPI = log(CPI_Var); /*Log transformation*/
+  	MGT_CPI = log ( CPI_Var / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
+  	AGT_CPI = log ( CPI_Var / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
+  	MRT_CPI = ( CPI_Var / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
+  	ART_CPI = ( CPI_Var / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
+  	MDT_CPI = dif(lag(CPI_Var)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
+  	pctchng_CPI = ( ( CPI_Var / lag( CPI_Var ) ) ** 12 - 1 ) * 100;
+  	AG_CPI = dif12( CPI_Var ) / lag12( CPI_Var ) * 100; /*computed percent change from the same period in the previous year*/
   run;
   
   
+title "Univariate Analysis for Consumer Price Index";
+proc univariate data = ConsumerPI plot normaltest  ; 
+var CPI_Var MRT_CPI;
+histogram / normal;
+inset mean median skewness/position = ne;
+run;
+title;
+  
+  
+
+/*   Housing Price Index (Monthly) */
+  
+  %let id010 = %nrstr(1A7XOhOGCHBizwh5_4sTNgMqYBPRVIvqH);
+  %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id010;
+  filename url_file url "&_url";
+  
+  data HPI ( drop = chardate lagvar1 lagvar12);
+  	infile url_file missover dsd firstobs=2;
+  	input chardate :$10. HPI_Var;
+  	date = input(chardate,yymmdd10.);
+  	label
+  	logP_HPI = "Log Transformation"
+  	MGT_HPI = "Monthly Growth Transformation"
+  	AGT_HPI = "Annual Growth Transformation"
+  	MRT_HPI = "Monthly Return Transformation"
+  	ART_HPI = "Annual Return Transformation"
+  	MDT_HPI = "Monthly Difference Transformation"
+  	pctchng_HPI = "Percetnage Change"
+  	AG_HPI = "Annual Growth in Percent"
+  	;
+  	format logP_HPI MGT_HPI AGT_HPI MRT_HPI ART_HPI MDT_HPI comma10.5 pctchng_HPI AG_HPI percent10.2 date ddmmyy10.;
+  	lagvar1 = lag(HPI_Var) ;
+  	lagvar12 = lag12(HPI_Var);
+  	logP_HPI = log(HPI_Var); /*Log transformation*/
+  	MGT_HPI = log ( HPI_Var / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
+  	AGT_HPI = log ( HPI_Var / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
+  	MRT_HPI = ( HPI_Var / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
+  	ART_HPI = ( HPI_Var / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
+  	MDT_HPI = dif(lag(HPI_Var)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
+  	pctchng_HPI = ( ( HPI_Var / lag( HPI_Var ) ) ** 12 - 1 ) * 100;
+  	AG_HPI = dif12( HPI_Var ) / lag12( HPI_Var ) * 100; /*computed percent change from the same period in the previous year*/
+  run;
+  
+  
+title "Univariate Analysis for Housing Price Index";
+proc univariate data = HPI plot normaltest  ; 
+var HPI_Var MRT_HPI;
+histogram / normal;
+inset mean median skewness/position = ne;
+run;
+title;
   
   
   
-  
-  
-  
- 
+/*   */
 /*  proc expand data = Housing_Starts out = temp1 */
 /*  			 from = month to = qtr; */
 /*  			 id = date; */

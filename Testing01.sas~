@@ -8,6 +8,17 @@
     logvar = log(HousingSt_Var);
   run;
 
+proc univariate data = Housing_Starts normal ; 
+run;
+
+proc sgplot data = Housing_Starts;
+  	 series x = date y = logvar;
+run;
+
+
+ proc print data = Housing_Starts;
+ run;
+ 
  
  
 /*  proc expand data = Housing_Starts out = temp1 */
