@@ -41,427 +41,404 @@ run;
 
 
 
-%put DATA PREPARATION;
+%put ----------------------------------------------------------------- DATA PREPARATION ;
 
+%macro prep();
 
-/*
-
-proc sort data = DATA.sample(drop = orig_rt orig_dte zb_date)
-          out = PD_DATA.origin;
-  by loan_id;
-run;
-
-
-
-* Prepare the data: create a new status variable;
-data PD_DATA.origin tmp_id(keep = loan_id curr_stat 
-                         rename = (loan_id = _id curr_stat = Next_stat)
-                         );
-  set PD_DATA.origin;
-  attrib Curr_stat length = $3.
-                   label = "Current State"
-                   ;
-                    
-  by loan_id;
-  retain _def 0;
+  proc sort data = DATA.sample(drop = orig_rt zb_date)
+            out = PD_DATA.origin;
+    by loan_id;
+  run;
   
-  if first.loan_id then do;            
-    _def = 0;
-  end;
   
-  if ^_def then do;
-    if dlq_stat = 0 then
-      Curr_stat = "CUR";
-    else if dlq_stat le 3 then
-      Curr_stat = "DEL";
-    else if dlq_stat = 999 and zb_code in ("01" "06") then
-      Curr_stat = "PPY";
-    else _def = 1;
-  end;
-  if _def then Curr_stat = "SDQ";
-run;
-
-data PD_DATA.origin(drop = _:);
-  merge PD_DATA.origin tmp_id(firstobs = 2);
-  attrib Next_stat length = $3.
-                   label = "Next State"
-                   ;
-  if loan_id ne _id then next_stat = "";
-run;
-
-
-
-data _final(drop = curr_stat);
-  set PD_DATA.origin(keep = loan_id curr_stat);
-  by loan_id;
-  attrib Final_stat length = $3.
-                   label = "Final State"
-                   ;
   
-  if last.loan_id then do;
-    Final_stat = curr_stat;
-    output;
-  end;
-run;
-
-* Grouping the FICO;
-
-data PD_DATA.loan;
-  merge PD_DATA.origin _final;
-  by loan_id;
-  length fico $10;
-  if 0 < cscore_b < 620 then
-    fico = '[0-620)';
-  if 620 <=cscore_b < 660 then
-    fico = '[620-660)';
-  if 660 <=cscore_b < 700 then
-    fico = '[660-700)';
-  if 700 <=cscore_b < 740 then
-    fico = '[700-740)';
-  if 740 <=cscore_b < 780 then
-    fico = '[740-780)';
-  if 780 <=cscore_b then
-    fico = '[780+)';
+  * Prepare the data: create a new status variable;
+  data PD_DATA.origin tmp_id(keep = loan_id curr_stat 
+                           rename = (loan_id = _id curr_stat = Next_stat)
+                           );
+    set PD_DATA.origin;
+    attrib Curr_stat length = $3.
+                     label = "Current State"
+                     ;
+                      
+    by loan_id;
+    retain _def 0;
+    
+    if first.loan_id then do;            
+      _def = 0;
+    end;
+    
+    if ^_def then do;
+      if dlq_stat = 0 then
+        Curr_stat = "CUR";
+      else if dlq_stat le 3 then
+        Curr_stat = "DEL";
+      else if dlq_stat = 999 and zb_code in ("01" "06") then
+        Curr_stat = "PPY";
+      else _def = 1;
+    end;
+    if _def then Curr_stat = "SDQ";
+  run;
   
-  drop dlq_stat zb_code;
-run;
+  data PD_DATA.origin(drop = _:);
+    merge PD_DATA.origin tmp_id(firstobs = 2);
+    attrib Next_stat length = $3.
+                     label = "Next State"
+                     ;
+    if loan_id ne _id then next_stat = "";
+  run;
+  
+  
+  
+  data _final(drop = curr_stat);
+    set PD_DATA.origin(keep = loan_id curr_stat);
+    by loan_id;
+    attrib Final_stat length = $3.
+                     label = "Final State"
+                     ;
+    
+    if last.loan_id then do;
+      Final_stat = curr_stat;
+      output;
+    end;
+  run;
+  
+  * Grouping the FICO;
+  
+  data PD_DATA.loan;
+    merge PD_DATA.origin _final;
+    by loan_id;
+    length fico $10;
+    if 0 < cscore_b < 620 then
+      fico = '[0-620)';
+    if 620 <=cscore_b < 660 then
+      fico = '[620-660)';
+    if 660 <=cscore_b < 700 then
+      fico = '[660-700)';
+    if 700 <=cscore_b < 740 then
+      fico = '[700-740)';
+    if 740 <=cscore_b < 780 then
+      fico = '[740-780)';
+    if 780 <=cscore_b then
+      fico = '[780+)';
+    
+    drop dlq_stat zb_code;
+  run;
+  
+  
+  %put DATA GROUPING;
+  
+  data PD_DATA.cur PD_DATA.del;
+    set PD_DATA.loan;
+    if Curr_stat = "CUR" then output PD_DATA.cur;
+    if Curr_stat = "DEL" then output PD_DATA.del;
+  run;
 
+%mend prep;
 
-%put DATA GROUPING;
+%prep()
 
-data PD_DATA.cur PD_DATA.del;
-  set PD_DATA.loan;
-  if Curr_stat = "CUR" then output PD_DATA.cur;
-  if Curr_stat = "DEL" then output PD_DATA.del;
-run;
-
-*/
-
-%put DATA SUMMARY;
+%put ----------------------------------------------------------------- DATA SUMMARY;
 
 %macro summary();
-
-* ODS powerpoint output;
-ods powerpoint file = "&p_pdres/summary.ppt"
-               style = Sapphire;
-
-ods graphics on / width=4in height=2in;
-
-options nodate;
-
-ods powerpoint exclude all;
-
-
-/*
-
-* Freq table: calculate the PD;
-ods output CrossTabFreqs = _freq1(keep = next_stat final_stat _type_ rowpercent
-                                  where = (_type_ = "11" and final_stat = "SDQ")
-                                  );
-proc freq data = PD_DATA.cur;
-  table Next_stat*final_stat;
-run;
-
-
-ods output CrossTabFreqs = _freq2(keep = next_stat final_stat _type_ rowpercent
-                                  where = (_type_ = "11" and final_stat = "SDQ")
-                                  );
-proc freq data = PD_DATA.del;
-  table Next_stat*final_stat;
-run;
-
-data _tmp1;
-  merge _freq1(keep = next_stat rowpercent
-               rename = (rowpercent = CUR)
-               )
-        _freq2(keep = next_stat rowpercent
-               rename = (rowpercent = DEL)
-               );
-  by next_stat;
-run;
-
-*/
-
-* Historical Transition Rate;
-
-ods output OneWayFreqs = _freq1(keep = next_stat percent);
-proc freq data = PD_DATA.cur;
-  table Next_stat;
-run;
-
-ods output OneWayFreqs = _freq2(keep = next_stat percent);
-proc freq data = PD_DATA.del;
-  table Next_stat;
-run;
-
-data _tmp1;
-  merge _freq1(rename = (percent = CUR))
-        _freq2(rename = (percent = DEL));
-  by next_stat;
-run;
-
-proc transpose data = _tmp1
-               prefix = stat
-               out = _tmp2;
-run;
-
-* Concatenate tables: data for bar chart;
-data _tmp3;
-  set _freq1(in = a) _freq2(in = b);
-  if a then stat = "CUR";
-  if b then stat = "DEL";
-  keep stat next_stat percent;
-run;
-
-
-proc sort data = PD_DATA.origin(where = (curr_stat in ("CUR" "DEL"))
-                                keep = curr_stat oltv dti cscore_b) out = _box;
-  by curr_stat;
-run;
-
-
-ods powerpoint exclude none;
-
-title "Competing Risk Transition Matrix(%)";
-footnote "";
-proc report data = _tmp2;
-  columns _name_ ('Next State'(stat1 stat2 stat3 stat4));
-  define _name_ / "Current State";
-  define stat1 / "Current (CUR)";
-  define stat2 / "Delinquent (DEL)";
-  define stat3 / "Prepay (PPY)";
-  define stat4 / "Default (SDQ)";
-run;
-title;
-
-title "Historical Transition Rate";
-proc sgplot data = _tmp3;
-  vbar next_stat/ response = percent group = stat
-                  groupdisplay = cluster nooutline;
-  styleattrs datacolors = (cx9ecae1 cx3182bd);
-  keylegend / title = "Current State";
-  yaxis label = "Probability of Default(%)"
-        grid  gridattrs = (color = 'cxdeebf7');
-run;
-title;
-
-ods graphics on / width=3in height=4in;
-
-title "Box Plot for Loan-level Drivers";
-proc boxplot data = _box;
-  plot (oltv dti cscore_b)*curr_stat / name = '' boxstyle = schematic 
-    outbox = _outbox(where = (_type_ in ("FARLOW" "LOW"))) ;
   
-  inset min mean(5.0) max/
-      header = 'Overall Statistics'
-      pos    = tm;
-run;
-title;
-
-ods powerpoint exclude all;
-
-ods output MissingValues = _misscur(keep = varname countnobs count);
-proc univariate data = PD_DATA.cur;
-  var oltv dti cscore_b;
-run;
-ods output MissingValues = _missdel(keep = varname countnobs count);
-proc univariate data = PD_DATA.del;
-  var oltv dti cscore_b;
-run;
-
-
-ods output CrossTabFreqs = _freq3(keep = curr_stat _var_ _type_ _type_2 frequency
-                                  where = (_type_2 = "111"));
-proc freq data = _outbox;
-  table curr_stat*_var_*_type_ / nocol nopercent;
-run;
-
-
-data _null_;
-  if 0 then set PD_DATA.cur(keep = loan_id) nobs = n;
-  call symputx('ncur', n);
-  stop;
-run;
-
-data _null_;
-  if 0 then set PD_DATA.del(keep = loan_id) nobs = n;
-  call symputx('ndel', n);
-  stop;
-run;
-
-data _missadd;
-  input Curr_stat $ varname $ _Type_ $ count;
-  datalines;
-  CUR Oltv MISSING 0
-  DEL Oltv MISSING 0
-  ;
-run;
-
-data _miss;
-  set _misscur(in = a) _missdel(in = b) _missadd;
-  _type_ = "MISSING";
-  if a then curr_stat = "CUR";
-  if b then curr_stat = "DEL";
-run;
-
-data _tmp1;
-  set _freq3(drop = _type_2) _miss(rename = (varname = _var_ count = frequency) drop = countnobs);
-  format cntout percent9.4;
-  if curr_stat = "CUR" then cntout = frequency/&ncur;
-  if curr_stat = "DEL" then cntout = frequency/&ndel;
-  freq = trim(left(put(frequency,8.))) || " " || "(" || trim(left(put(cntout,percent9.4))) || ")";
-  drop frequency cntout;
-run;
-
-proc sort data = _tmp1;
-  by curr_stat _var_ _type_;
-run;
-
-proc transpose data = _tmp1(where = (curr_stat = "CUR")) out = _tbcur(drop = _name_);
-  id _type_;
-  by _var_;
-  var freq;
-run;
-
-proc transpose data = _tmp1(where = (curr_stat = "DEL")) out = _tbdel(drop = _name_);
-  id _type_;
-  by _var_;
-  var freq;
-run;
-
-data _tbcur;
-  set _tbcur;
-  select (_var_);
-    when("Cscore_b") _var = "FICO";
-    when("Dti") _var = "DTI";
-    when("Oltv") _var = "OLTV";
-  end;
-  drop = _var_;
-run;
-
-data _tbdel;
-  set _tbdel;
-  select (_var_);
-    when("Cscore_b") _var = "FICO";
-    when("Dti") _var = "DTI";
-    when("Oltv") _var = "OLTV";
-  end;
-  drop = _var_;
-run;
-
-
-ods powerpoint exclude none;
-
-title "Frequency Table of Outliers and Missing Value";
-footnote j=l "Current State = CUR";
-proc report data = _tbcur;
-  columns _var ("Outlier" (low farlow)) missing;
-  define _var / "Variable";
-  define low / "Low";
-  define farlow / "Low Far";
-  define missing / "Missing Value";
-run;
-footnote j=l "Current State = DEL";
-proc report data = _tbdel;
-  columns _var ("Outlier" (low farlow)) missing;
-  define _var / "Variable";
-  define low / "Low";
-  define farlow / "Low Far";
-  define missing / "Missing Value";
-run;
-title;
-footnote;
-ods powerpoint exclude all;
-/* proc means data = _outbox (where = (_type_ in ("FARLOW" "LOW") and _var_ in ("Oltv" "Cscore_b"))); */
-/*   var _value_; */
-/*   by _type_; */
-/* run; */
-
-
-ods powerpoint close;
+  * ODS powerpoint output;
+  ods powerpoint file = "&p_pdres/summary.ppt"
+                 style = Sapphire;
+  
+  ods graphics on / width=4in height=2in;
+  
+  options nodate;
+  
+  ods powerpoint exclude all;
+  
+  
+  /*
+  
+  * Freq table: calculate the PD;
+  ods output CrossTabFreqs = _freq1(keep = next_stat final_stat _type_ rowpercent
+                                    where = (_type_ = "11" and final_stat = "SDQ")
+                                    );
+  proc freq data = PD_DATA.cur;
+    table Next_stat*final_stat;
+  run;
+  
+  
+  ods output CrossTabFreqs = _freq2(keep = next_stat final_stat _type_ rowpercent
+                                    where = (_type_ = "11" and final_stat = "SDQ")
+                                    );
+  proc freq data = PD_DATA.del;
+    table Next_stat*final_stat;
+  run;
+  
+  data _tmp1;
+    merge _freq1(keep = next_stat rowpercent
+                 rename = (rowpercent = CUR)
+                 )
+          _freq2(keep = next_stat rowpercent
+                 rename = (rowpercent = DEL)
+                 );
+    by next_stat;
+  run;
+  
+  */
+  
+  * Historical Transition Rate;
+  
+  ods output OneWayFreqs = _freq1(keep = next_stat percent);
+  proc freq data = PD_DATA.cur;
+    table Next_stat;
+  run;
+  
+  ods output OneWayFreqs = _freq2(keep = next_stat percent);
+  proc freq data = PD_DATA.del;
+    table Next_stat;
+  run;
+  
+  data _tmp1;
+    merge _freq1(rename = (percent = CUR))
+          _freq2(rename = (percent = DEL));
+    by next_stat;
+  run;
+  
+  proc transpose data = _tmp1
+                 prefix = stat
+                 out = _tmp2;
+  run;
+  
+  * Concatenate tables: data for bar chart;
+  data _tmp3;
+    set _freq1(in = a) _freq2(in = b);
+    if a then stat = "CUR";
+    if b then stat = "DEL";
+    keep stat next_stat percent;
+  run;
+  
+  
+  proc sort data = PD_DATA.origin(where = (curr_stat in ("CUR" "DEL"))
+                                  keep = curr_stat oltv dti cscore_b) out = _box;
+    by curr_stat;
+  run;
+  
+  
+  ods powerpoint exclude none;
+  
+  title "Competing Risk Transition Matrix(%)";
+  footnote "";
+  proc report data = _tmp2;
+    columns _name_ ('Next State'(stat1 stat2 stat3 stat4));
+    define _name_ / "Current State";
+    define stat1 / "Current (CUR)";
+    define stat2 / "Delinquent (DEL)";
+    define stat3 / "Prepay (PPY)";
+    define stat4 / "Default (SDQ)";
+  run;
+  title;
+  
+  title "Historical Transition Rate";
+  proc sgplot data = _tmp3;
+    vbar next_stat/ response = percent group = stat
+                    groupdisplay = cluster nooutline;
+    styleattrs datacolors = (cx9ecae1 cx3182bd);
+    keylegend / title = "Current State";
+    yaxis label = "Probability of Default(%)"
+          grid  gridattrs = (color = 'cxdeebf7');
+  run;
+  title;
+  
+  ods graphics on / width=3in height=4in;
+  
+  title "Box Plot for Loan-level Drivers";
+  proc boxplot data = _box;
+    plot (oltv dti cscore_b)*curr_stat / name = '' boxstyle = schematic 
+      outbox = _outbox(where = (_type_ in ("FARLOW" "LOW"))) ;
+    
+    inset min mean(5.0) max/
+        header = 'Overall Statistics'
+        pos    = tm;
+  run;
+  title;
+  
+  ods powerpoint exclude all;
+  
+  ods output MissingValues = _misscur(keep = varname countnobs count);
+  proc univariate data = PD_DATA.cur;
+    var oltv dti cscore_b;
+  run;
+  ods output MissingValues = _missdel(keep = varname countnobs count);
+  proc univariate data = PD_DATA.del;
+    var oltv dti cscore_b;
+  run;
+  
+  
+  ods output CrossTabFreqs = _freq3(keep = curr_stat _var_ _type_ _type_2 frequency
+                                    where = (_type_2 = "111"));
+  proc freq data = _outbox;
+    table curr_stat*_var_*_type_ / nocol nopercent;
+  run;
+  
+  
+  data _null_;
+    if 0 then set PD_DATA.cur(keep = loan_id) nobs = n;
+    call symputx('ncur', n);
+    stop;
+  run;
+  
+  data _null_;
+    if 0 then set PD_DATA.del(keep = loan_id) nobs = n;
+    call symputx('ndel', n);
+    stop;
+  run;
+  
+  data _missadd;
+    input Curr_stat $ varname $ _Type_ $ count;
+    datalines;
+    CUR Oltv MISSING 0
+    DEL Oltv MISSING 0
+    ;
+  run;
+  
+  data _miss;
+    set _misscur(in = a) _missdel(in = b) _missadd;
+    _type_ = "MISSING";
+    if a then curr_stat = "CUR";
+    if b then curr_stat = "DEL";
+  run;
+  
+  data _tmp1;
+    set _freq3(drop = _type_2) _miss(rename = (varname = _var_ count = frequency) drop = countnobs);
+    format cntout percent9.4;
+    if curr_stat = "CUR" then cntout = frequency/&ncur;
+    if curr_stat = "DEL" then cntout = frequency/&ndel;
+    freq = trim(left(put(frequency,8.))) || " " || "(" || trim(left(put(cntout,percent9.4))) || ")";
+    drop frequency cntout;
+  run;
+  
+  proc sort data = _tmp1;
+    by curr_stat _var_ _type_;
+  run;
+  
+  proc transpose data = _tmp1(where = (curr_stat = "CUR")) out = _tbcur(drop = _name_);
+    id _type_;
+    by _var_;
+    var freq;
+  run;
+  
+  proc transpose data = _tmp1(where = (curr_stat = "DEL")) out = _tbdel(drop = _name_);
+    id _type_;
+    by _var_;
+    var freq;
+  run;
+  
+  data _tbcur;
+    set _tbcur;
+    select (_var_);
+      when("Cscore_b") _var = "FICO";
+      when("Dti") _var = "DTI";
+      when("Oltv") _var = "OLTV";
+    end;
+    drop = _var_;
+  run;
+  
+  data _tbdel;
+    set _tbdel;
+    select (_var_);
+      when("Cscore_b") _var = "FICO";
+      when("Dti") _var = "DTI";
+      when("Oltv") _var = "OLTV";
+    end;
+    drop = _var_;
+  run;
+  
+  
+  ods powerpoint exclude none;
+  
+  title "Frequency Table of Outliers and Missing Value";
+  footnote j=l "Current State = CUR";
+  proc report data = _tbcur;
+    columns _var ("Outlier" (low farlow)) missing;
+    define _var / "Variable";
+    define low / "Low";
+    define farlow / "Low Far";
+    define missing / "Missing Value";
+  run;
+  footnote j=l "Current State = DEL";
+  proc report data = _tbdel;
+    columns _var ("Outlier" (low farlow)) missing;
+    define _var / "Variable";
+    define low / "Low";
+    define farlow / "Low Far";
+    define missing / "Missing Value";
+  run;
+  title;
+  footnote;
+  ods powerpoint exclude all;
+  /* proc means data = _outbox (where = (_type_ in ("FARLOW" "LOW") and _var_ in ("Oltv" "Cscore_b"))); */
+  /*   var _value_; */
+  /*   by _type_; */
+  /* run; */
+  
+  
+  ods powerpoint close;
 
 %mend summary;
-
-*%summary();
-
-
-* Prepare for the scatter plot;
-
-/*
-data _tmp4;
-  set PD_DATA.origin;
-  by loan_id;
-  if first.loan_id;
-  keep cscore_b loan_id final_stat;
-run;
-
-ods output CrossTabFreqs = _tmp5;
-proc freq data = _tmp4;
-  table cscore_b*final_stat;
-run;
-
-data _tmp6(keep = cscore_b rowpercent);
-  label rowpercent = "Probability of Default (%)";
-  set _tmp5;
-  if final_stat = "SDQ" & _type_ = "11";
-run;
-
- 
-
-
-
-title "Scatter Plots of PD by FICO";
-proc sgscatter data = _tmp6;
-  compare X = cscore_b Y = rowpercent / grid;
-run;
-title;
-
-
-
-*/
-
-
-
-
-
-
 
 /* 
 proc sgscatter data = PD_DATA.del;
   matrix oltv dti cscore_b / diagonal = (histogram kernel);
 run;
- */
-
-
-%put FORMAT;
-/*
-proc format lib = PD_DATA;
-  value fico low -< 620 = '[0-620)'
-             620 -< 660 = '[620-660)'
-             660 -< 700 = '[660-700)'
-             700 -< 740 = '[700-740)'
-             740 -< 780 = '[740-780)'
-             780 - high = '[780+)'
-  ;
-run;
-             
 */
 
-%put DATA MERGING;
-/*
-* Merge the loan-level data with macros by date;
+/* %summary(); */
 
-proc sort data = PD_DATA.loan;
-  by act_date;
-run;
 
-data PD_DATA.merge;
-  merge PD_DATA.loan PD_DATA.macro;
-  by act_date;
 
-run;
 
-*/
+%put ----------------------------------------------------------------- FORMAT;
+
+%macro format();
+  proc format lib = PD_DATA;
+    value fico low -< 620 = '[0-620)'
+               620 -< 660 = '[620-660)'
+               660 -< 700 = '[660-700)'
+               700 -< 740 = '[700-740)'
+               740 -< 780 = '[740-780)'
+               780 - high = '[780+)'
+    ;
+  run;
+%mend format;
+
+/* %format() */
+
+
+%put ----------------------------------------------------------------- DATA MERGING;
+
+%macro merge();
+  * Merge the loan-level data with macros by date;
+  
+  proc sort data = DATA.macros(rename = (date = act_date)) out = PD_DATA.macros;
+    by act_date;
+  run;
+  
+  proc sort data = PD_DATA.del out = del;
+    by act_date;
+  run;
+  
+  
+  data del;
+    merge del PD_DATA.macros;
+    by act_date;
+    if ^missing(loan_id);
+  run;
+  
+  proc sort data = del;
+    by loan_id act_date;
+  run;
+
+
+%mend merge;
+
+quit;
 
 
 
