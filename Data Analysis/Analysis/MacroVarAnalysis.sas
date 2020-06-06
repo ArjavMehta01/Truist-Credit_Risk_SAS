@@ -63,7 +63,7 @@ title;
   data GDP (drop = chardate lagvar1 lagvar12 );
   	infile url_file missover dsd  firstobs = 2;
   	input chardate :$10. GDP_Var;
-  	date = input(chardate , yymmdd10.);
+  	date = input(chardate , mmddyy10.);
   	label 
   	GDP_Var = "US GDP"
   	logP_GDP = "Log Transformation"
@@ -172,17 +172,13 @@ title;
 /*   MERGING UNEMP AND HOUSING STARTS */
 
 
-data merged_Data  (where = (date between '01Jan2005'd and '01Jan2020'd) keep = date HPI_Var HousingSt_Var MDT_: Unemp_Var PPI_Var Permits Payrolls);
-   merge Housing_Starts Unemployment ProducerPI Permits TNFPayrolls HPI ;
+data merged_Data  (where = (date between '01Jan2005'd and '01Jan2020'd) );
+   merge Housing_Starts Unemployment ProducerPI Permits TNFPayrolls ;
    by date;
 run;
 
 
-  set Housing_Starts (keep = date HousingSt_Var MDT_:);
-   set Unemployment (keep = date Unemp_Var MDT_:);
-   set ProducerPI( keep = date PPI_Var MDT_: );
-   set Permits(keep = date Permits MDT_:);
-   set TNFPayrolls(Keep = date Payrolls MDT_:);
+
 proc contents data = merged_Data;
 run;
 
@@ -197,7 +193,7 @@ proc export
 run;
 
 proc sgscatter data = merged_Data;
-  compare X = HousingSt_Var Y = Unemp_Var / grid;
+  compare X = MDT_HS Y = MDT_UMP / grid;
 run;
 
 /* Plot of two variables to see their trends */
@@ -211,9 +207,7 @@ yaxis label = 'Housing Starts' grid ;
 y2axis label = 'Unemployment' grid ;
 run;
 
-proc corr data = merged_Data pearson plots = none;
-	var MDT_UMP ;
-	with MDT_HS;
+proc corr data = merged_Data pearson plots = none rank nosimple;
 run;
 
 /* proc gplot data = merged_Data; */
@@ -231,13 +225,39 @@ run;
 /* run; */
 /*  */
 /*  */
-/* proc corr data = Temp001 pearson nosimple plots = matrix (histogram) rank nosimple; */
-/* 	var Unemp_Var logP_UMP MGT_UMP AGT_UMP MRT_UMP ART_UMP MDT_UMP ; */
-/* 	with HousingSt_Var logP_HS MGT_HS AGT_HS MRT_HS ART_HS MDT_HS ;	 */
-/* 	run; */
-/* 	 */
+proc corr data = merged_Data pearson nosimple plots = matrix (histogram) rank nosimple;
+	var Unemp_Var logP_UMP MGT_UMP AGT_UMP MRT_UMP ART_UMP MDT_UMP ;
+	with HousingSt_Var logP_HS MGT_HS AGT_HS MRT_HS ART_HS MDT_HS ;	
+	run;
+	
+
+proc template;
+   edit Base.Corr.StackedMatrix;
+      column (RowName RowLabel) (Matrix) * (Matrix2);
+      edit matrix;
+         cellstyle _val_  = -1.00 as {backgroundcolor=CXEEEEEE},
+/*                    _val_ <= -0.75 as {backgroundcolor=red}, */
+/*                    _val_ <= -0.50 as {backgroundcolor=blue}, */
+                   _val_ <= -0.1 as {backgroundcolor=white},
+                   _val_ <=  0.1 as {backgroundcolor=pink},
+/*                    _val_ <=  0.50 as {backgroundcolor=cyan}, */
+/*                    _val_ <=  0.75 as {backgroundcolor=blue}, */
+/*                    _val_ <   1.00 as {backgroundcolor=red}, */
+                   _val_  =  1.00 as {backgroundcolor=CXEEEEEE};
+      end;
+   end;
+run;
 
 
+
+proc corr data=merged_Data noprob plots = none ;
+    ods select PearsonCorr;
+run;
+
+
+proc template;
+   delete Base.Corr.StackedMatrix / store=sasuser.templat;
+run;
 
 
   
@@ -265,12 +285,12 @@ run;
 title;
   
 /*   Total Non-farm Payrolls (Monthly) */
-  %let id05 = %nrstr(1iDdiHWP7ihEtEh1zED3XQup0ksdNmK_J);
+  %let id05 = %nrstr(1-B51oVV3rNplZpm9KKG4ETjtB_uVdJC5);
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id05;
   filename url_file url "&_url";
   
   data TNFPayrolls ( drop =chardate lagvar1   lagvar12 );
-  	infile url_file missover dsd;
+  	infile url_file missover dsd firstobs= 2;
   	input chardate :$10. Payrolls;
   	date = input(chardate,yymmdd10.);
     label
@@ -346,7 +366,7 @@ title;
   	input chardate :$10. Permits;
     date = input(chardate,yymmdd10.);	
   	label
-  	logP_HOP = "Log Transformation"
+  	log_HOP = "Log Transformation"
   	MGT_HOP = "Monthly Growth Transformation"
   	AGT_HOP = "Annual Growth Transformation"
   	MRT_HOP = "Monthly Return Transformation"
@@ -358,7 +378,7 @@ title;
   	format log_HOP MGT_HOP AGT_HOP MRT_HOP ART_HOP MDT_HOP comma10.5 pctchng_HOP AG_HOP percent10.2 date ddmmyy10.;
   	lagvar1 = lag(Permits) ;
   	lagvar12 = lag12(Permits);
-  	logP_HOP = log(Permits); /*Log transformation*/
+  	log_HOP = log(Permits); /*Log transformation*/
   	MGT_HOP = log ( Permits / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
   	AGT_HOP = log ( Permits / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
   	MRT_HOP = ( Permits / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
@@ -552,13 +572,11 @@ run;
 run;
  
  data Macros1( where = (date between '01Jan2005'd and '12Dec2017'd) );
-  
    set Housing_Starts (keep = date HousingSt_Var MDT_:);
    set Unemployment (keep = date Unemp_Var MDT_:);
    set ProducerPI( keep = date PPI_Var MDT_: );
    set Permits(keep = date Permits MDT_:);
    set TNFPayrolls(Keep = date Payrolls MDT_:);
-   
    run;
    
   proc compare base = Macros
