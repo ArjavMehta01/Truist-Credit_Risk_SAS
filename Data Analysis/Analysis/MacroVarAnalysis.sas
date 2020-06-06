@@ -38,13 +38,13 @@ Macroeconomic Variables Analysis */
   
   
   proc print data = Housing_Starts label;
-  run;
- 
+ run;
+  
 
 /*   Univariate analysis for various variables */
 title "Univariate Analysis for Housing Starts";
 proc univariate data = Housing_Starts plot normaltest  ; 
-var HousingSt_Var MRT_HS;
+var HousingSt_Var MDT_HS;
 histogram / normal;
 inset mean median skewness/position = ne;
 run;
@@ -56,14 +56,14 @@ title;
 
 /* US GDP (Quarterly) */
 
-  %let id02 = %nrstr(1Nolfw8rIW7gFQEbKAR3X-4KaSKUNMZzZ);
+  %let id02 = %nrstr(1Pyf8AO44zzDxDUfSWdwi4Bi4wUNhybgb);
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id02;
   filename url_file url "&_url";
   
-  data GDP (drop = chardate lagvar1 lagvar4 );
-  	infile url_file missover dsd;
+  data GDP (drop = chardate lagvar1 lagvar12 );
+  	infile url_file missover dsd  firstobs = 2;
   	input chardate :$10. GDP_Var;
-  	date = input(chardate,yymmdd10.);
+  	date = input(chardate , yymmdd10.);
   	label 
   	GDP_Var = "US GDP"
   	logP_GDP = "Log Transformation"
@@ -77,18 +77,18 @@ title;
   	;
   	format logP_GDP QGT_GDP AGT_GDP QRT_GDP ART_GDP QDT_GDP comma10.5 pctchng_GDP AG_GDP percent10.2 date mmddyy10.;
   	lagvar1 = lag(GDP_Var) ;
-  	lagvar4 = lag4(GDP_Var);
-  	logP_GDP = log(GDP_Var); /*Log transformation*/
-  	QGT_GDP = log ( GDP_Var / lagvar1 ); /*Quarterly Growth Transformation ( ln(Xt / Xt-1) )*/ 
-  	AGT_GDP = log ( GDP_Var / lagvar4 ); /*Annual Growth Transformation ( ln(Xt / Xt-4) ) */
-  	QRT_GDP= ( GDP_Var / lagvar1 ) ;/* Quarterly Return Transformation ( Xt / Xt-1 ) */
-  	ART_GDP = ( GDP_Var / lagvar1 ) ;/* Annual Return Transformation (Xt / Xt-4 ) */
+  	lagvar12 = lag12(GDP_Var);
+  	logP_GDP = log(GDP_Var); /*Log transformation */
+  	QGT_GDP = log ( GDP_Var / lagvar1 ); /*Quarterly Growth Transformation ( ln(Xt / Xt-1) ) */
+  	AGT_GDP = log ( GDP_Var / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-4) )*/
+  	QRT_GDP= ( GDP_Var / lagvar1 ) ;/* Quarterly Return Transformation ( Xt / Xt-1 )*/
+  	ART_GDP = ( GDP_Var / lagvar1 ) ;/* Annual Return Transformation (Xt / Xt-4 )*/
   	QDT_GDP = dif(lag(GDP_Var)); /* Quarterly Difference Transformation ( Xt - Xt-1 ) */	
-  	pctchng_GDP = ( ( GDP_Var / lag( GDP_Var ) ) ** 12 - 1 ) * 100;
-  	AG_GDP = dif4( GDP_Var ) / lag4( GDP_Var ) * 100; /*computed percent change from the same period in the previous year*/
+  	pctchng_GDP = ( ( GDP_Var / lag( GDP_Var ) ) ** 12 - 1 ) * 100; 
+  	AG_GDP = dif12( GDP_Var ) / lag12( GDP_Var ) * 100; /*computed percent change from the same period in the previous year*/
   run;
   
-/*   Univariate Analysis for GDP */
+  Univariate Analysis for GDP
 title "Univariate Analysis for GDP";
 proc univariate data = GDP plot normaltest  ; 
 var logP_GDP AG_GDP QDT_GDP QGT_GDP;
@@ -100,12 +100,12 @@ title;
 
 /* Unemployment (Monthly) */
   
-  %let id03 = %nrstr(1QhbI6yakMv9Q-8dwn0nwcJeX6kWQjJ76);
+  %let id03 = %nrstr(1d_FSMP5r5xM5F3LMY46UZuEwHw9m5weG);
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id03;
   filename url_file url "&_url";
   
   data Unemployment (Drop = chardate lagvar1 lagvar12);
-  	infile url_file missover dsd;
+  	infile url_file missover dsd firstobs= 2;
   	input chardate:$10. Unemp_Var;
   	date = input(chardate,yymmdd10.);
   	label
@@ -151,20 +151,39 @@ title;
   run;
   title;
   
-
   
+
+  data XYZ (where = (date between '01Jan2005'd and '01Jan2020'd) );
+  merge Housing_Starts Unemployment;
+  by date;
+  run;
+  
+  proc sgscatter data = XYZ ;
+  compare X = HousingSt_Var Y = Unemp_Var;
+  run;
+  
+  proc corr data = XYZ pearson rank;
+  var HousingSt_Var MDT_HS;
+  with Unemp_Var MDT_UMP;
+  run;
   
   
 /*   ####################### */
 /*   MERGING UNEMP AND HOUSING STARTS */
 
 
-data merged_Data  (where = (date between '01Jan2005'd and '01Jan2016'd) );
-   set Housing_Starts;
-   set Unemployment;
-   set ProducerPI;
-   set Permits;
-   set TNFPayrolls;
+data merged_Data  (where = (date between '01Jan2005'd and '01Jan2020'd) keep = date HPI_Var HousingSt_Var MDT_: Unemp_Var PPI_Var Permits Payrolls);
+   merge Housing_Starts Unemployment ProducerPI Permits TNFPayrolls HPI ;
+   by date;
+run;
+
+
+  set Housing_Starts (keep = date HousingSt_Var MDT_:);
+   set Unemployment (keep = date Unemp_Var MDT_:);
+   set ProducerPI( keep = date PPI_Var MDT_: );
+   set Permits(keep = date Permits MDT_:);
+   set TNFPayrolls(Keep = date Payrolls MDT_:);
+proc contents data = merged_Data;
 run;
 
 proc print data = merged_Data label;
@@ -192,6 +211,10 @@ yaxis label = 'Housing Starts' grid ;
 y2axis label = 'Unemployment' grid ;
 run;
 
+proc corr data = merged_Data pearson plots = none;
+	var MDT_UMP ;
+	with MDT_HS;
+run;
 
 /* proc gplot data = merged_Data; */
 /* plot HousingSt_Var Unemp_Var; */
@@ -202,29 +225,31 @@ run;
 /* var HousingSt_Var Unemp_Var; */
 /* run; */
 
-proc corr data = merged_Data pearson nosimple plots = matrix (histogram) rank nosimple;
-	var Unemp_Var logP_UMP MGT_UMP AGT_UMP MRT_UMP ART_UMP MDT_UMP ;
-	with HousingSt_Var logP_HS MGT_HS AGT_HS MRT_HS ART_HS MDT_HS ;	
-	run;
-	
-proc freq data = Merged_data;
-table MRT_HS*MRT_UMP / nocol norow nopercent expected
-chisq;
-run;
+/* data Temp001 ;  */
+/* set Housing_Starts; */
+/* set Unemployment; */
+/* run; */
+/*  */
+/*  */
+/* proc corr data = Temp001 pearson nosimple plots = matrix (histogram) rank nosimple; */
+/* 	var Unemp_Var logP_UMP MGT_UMP AGT_UMP MRT_UMP ART_UMP MDT_UMP ; */
+/* 	with HousingSt_Var logP_HS MGT_HS AGT_HS MRT_HS ART_HS MDT_HS ;	 */
+/* 	run; */
+/* 	 */
 
 
 
 
   
   
-/*   Mortgage Rates (Weekly) */
+/*   Mortgage Rates (Monthly) */
   
-  %let id04 = %nrstr(1RsN5jzXeEbLtYxVs_rXvBBXrasaymG6k);
+  %let id04 = %nrstr(1raQTrq7GdUrOMPKNzWNMboJYKpekpGmK);
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id04;
   filename url_file url "&_url";
   
   data MortgageRate30;
-  	infile url_file missover dsd;
+  	infile url_file missover dsd firstobs= 2;
   	input chardate :$10. Rates;
   	date = input(chardate,yymmdd10.);
   run;
@@ -312,12 +337,12 @@ title;
   
 /*   Housing Permits (Monthly) */
   
-  %let id07 = %nrstr(1p1oHE48ef87PLNcsLdfw1AbVo0VmwwGA);
+  %let id07 = %nrstr(1b7mm8OMorXBobVMOV9hF_TI9ZBmwSn6-);
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id07;
   filename url_file url "&_url";
   
   data Permits ( drop = chardate lagvar1 lagvar12);
-  	infile url_file missover dsd;
+  	infile url_file missover dsd firstobs= 2;
   	input chardate :$10. Permits;
     date = input(chardate,yymmdd10.);	
   	label
@@ -503,3 +528,41 @@ if _N_ >= &roll_num then do;
    end;
    format roll_avg comma10.2;
 run;
+
+
+
+
+/* ########################## */
+
+
+
+
+ %let id011 = %nrstr(1VifKPbqniR03UyDYRCYGBGTJXnld_319);
+ %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id011;
+ filename url_file url "&_url";
+ 
+ 
+ data Macros ;
+ infile url_file missover dsd firstobs=2;
+ input HousingSt_Var date :$10. MDT_HS Unemp_Var MDT_UMP PPI_Var MDT_PPI HPI_Var MDT_HPI Payrolls MDT_TNF;
+ run;
+  
+  proc sgscatter data = Macros;
+  compare X = HousingSt_Var Y = Unemp_Var / grid;
+run;
+ 
+ data Macros1( where = (date between '01Jan2005'd and '12Dec2017'd) );
+  
+   set Housing_Starts (keep = date HousingSt_Var MDT_:);
+   set Unemployment (keep = date Unemp_Var MDT_:);
+   set ProducerPI( keep = date PPI_Var MDT_: );
+   set Permits(keep = date Permits MDT_:);
+   set TNFPayrolls(Keep = date Payrolls MDT_:);
+   
+   run;
+   
+  proc compare base = Macros
+  	compare = Macros1;
+run;  
+  
+  
