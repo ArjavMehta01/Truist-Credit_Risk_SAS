@@ -491,7 +491,7 @@ run;
     by act_date;
     
     if missing(act_upb) then CLTV = oltv;
-      else CLTV = oltv*(hpi/orig_hpi)*(act_upb/orig_amt);
+      else CLTV = oltv*(orig_hpi/hpi)*(act_upb/orig_amt);
       
     if ^missing(loan_id);
   run;

@@ -3,7 +3,7 @@
 
 * Setup the head format;
 %let mac_head = 
-                 _HS    date : mmddyy10.  HS_MDT   _UMP      UMP_MDT
+                 _HS    date : ddmmyy10.  HS_MDT   _UMP      UMP_MDT
                  _PPI   PPI_MDT           HPI      _HPI_MDT  _TNF     TNF_MDT
 ;
 
