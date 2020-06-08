@@ -136,7 +136,16 @@ run;
 
 %mend prep;
 
+
+
+* UN-comment this code to run the prepration function;
+
 /* %prep() */
+
+
+
+
+
 
 %put ----------------------------------------------------------------- DATA SUMMARY;
 
@@ -379,15 +388,21 @@ run;
   /* run; */
   
   
+  /* 
+  proc sgscatter data = PD_DATA.del;
+    matrix oltv dti cscore_b / diagonal = (histogram kernel);
+  run;
+  */
+  
   ods powerpoint close;
 
 %mend summary;
 
-/* 
-proc sgscatter data = PD_DATA.del;
-  matrix oltv dti cscore_b / diagonal = (histogram kernel);
-run;
-*/
+
+
+
+
+* DON'T run this;
 
 /* %summary(); */
 
@@ -426,53 +441,53 @@ run;
   run;
   
   * Creat the orig_hpi for DEL;
-  proc sort data = PD_DATA.del out = _tmp1;
+  proc sort data = PD_DATA.del out = PD_DATA.t_del;
     by orig_dte;
   run;
   
-  data _tmp1;
-    merge _tmp1 PD_DATA.macros(keep = date hpi rename = (date = orig_dte));
+  data PD_DATA.t_del;
+    merge PD_DATA.t_del PD_DATA.macros(keep = date hpi rename = (date = orig_dte));
     by orig_dte;
     rename hpi = orig_hpi;
   run;
   
-  proc sort data = _tmp1;
+  proc sort data = PD_DATA.t_del;
     by act_date;
   run;
   
-  data del;
-    merge _tmp1 PD_DATA.macros(rename = (date = act_date));
+  data PD_DATA.t_del;
+    merge PD_DATA.t_del PD_DATA.macros(rename = (date = act_date));
     by act_date;
     
     if missing(act_upb) then CLTV = oltv;
-      else CLTV = oltv*(hpi/orig_hpi)*(act_upb/orig_amt);
+      else CLTV = oltv*(orig_hpi/hpi)*(act_upb/orig_amt);
       
     if ^missing(loan_id);
   run;
   
-  proc sort data = del(keep = &var) out = PD_DATA.tmp;
+  proc sort data = PD_DATA.t_del(keep = &var);
     by loan_id act_date;
   run;
 
 
 
   * Creat the orig_hpi for CUR;
-  proc sort data = PD_DATA.cur out = _tmp2;
+  proc sort data = PD_DATA.cur out = PD_DATA.t_cur;
     by orig_dte;
   run;
   
-  data _tmp2;
-    merge _tmp2 PD_DATA.macros(keep = date hpi rename = (date = orig_dte));
+  data PD_DATA.t_cur;
+    merge PD_DATA.t_cur PD_DATA.macros(keep = date hpi rename = (date = orig_dte));
     by orig_dte;
     rename hpi = orig_hpi;
   run;
   
-  proc sort data = _tmp2;
+  proc sort data = PD_DATA.t_cur;
     by act_date;
   run;
   
-  data cur;
-    merge _tmp2 PD_DATA.macros(rename = (date = act_date));
+  data PD_DATA.t_cur;
+    merge PD_DATA.t_cur PD_DATA.macros(rename = (date = act_date));
     by act_date;
     
     if missing(act_upb) then CLTV = oltv;
@@ -481,14 +496,19 @@ run;
     if ^missing(loan_id);
   run;
   
-  proc sort data = cur(keep = &var) out = PD_DATA.tmp2;
+  proc sort data = PD_DATA.t_cur(keep = &var);
     by loan_id act_date;
   run;
 
 %mend merge;
 
-%merge();
 
+
+
+
+* Merging the lona-level and macros data;
+
+%merge();
 
 
 
