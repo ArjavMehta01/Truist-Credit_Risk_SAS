@@ -3,10 +3,10 @@
 
 
 
-
 * You can download shared file and save as tmp.txt by running this code;
 
 %let id = %nrstr(164e4YneTI1zNnmDRv7AMP_hPMH4N76-e);
+
 %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&id;
 
 filename _local "/folders/myfolders/GitHub/Truist-Credit_Risk_SAS/Data Analysis/tmp.txt";
@@ -74,7 +74,7 @@ run;
   filename url_file url "&_url";
 
   data tmp;
-    infile f_perf("Performance_&date..txt") dlm = "|" missover dsd lrecl=32767 obs = 10;*&option;
+    infile url_file dlm = "|" missover dsd lrecl=32767 obs = 10;*&option;
     input &perf_head;
     
     *date conversion;

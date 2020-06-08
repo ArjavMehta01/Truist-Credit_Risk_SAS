@@ -1,19 +1,51 @@
 /* Author: Jonas */
-/* Purpose: Example of Statistics analysis on Q1 data */
+
+/* Purpose: Example of Statistics analysis on sample data */
 
 options nodate;
+/*
 
 ods pdf file = "&p_report.Contents.pdf"
         style = Sapphire;
 
 title "Content Table";
-proc contents data = DATA.sample_Q1 varnum;
+
+proc contents data = DATA.sample varnum;
+
   ods select Position;
   ods output Position = content;
 run;
 title;
 
 ods pdf close;
+
+*/
+
+* prepare data for calculating PD;
+data DATA.tmp;
+  set DATA.sample;
+  label def_flg = "Default Flag";
+  if missing(dlq_stat) then delete;
+  else do;
+    if dlq_stat < 3 then def_flg = 0;
+    else if dlq_stat = 999 and (nmiss(zb_code) or zb_code in ("01" "06")) then def_flg = 0;
+    else def_flg = 1;
+  end;
+run;
+
+proc sort data = DATA.tmp;
+  by loan_id descending def_flg;
+run;
+
+* PD time series scatter plot;
+ods output CrossTabFreqs = tmp;
+proc freq data = DATA.tmp;
+  table act_date*def_flg;
+run;
+
+data tmp(keep = act_date rowpercent);
+  set tmp;
+  label rowpercent = "Probability of Default(%)";
 
 
 * change the value of this macro variable: Q1-Q4;
@@ -56,7 +88,8 @@ run;
 
 
 
-ods powerpoint file = "&p_report/scatter_plot.ppt"
+ods powerpoint file = "&p_report/_summary.ppt"
+
                style = Sapphire;
 
 ods graphics on / width=4in height=4in;
@@ -69,6 +102,7 @@ title;
 
 ods powerpoint exclude all;
 
+
 %macro pd_scatter(driver, n_driver);
 
   data tmp;
@@ -78,10 +112,12 @@ ods powerpoint exclude all;
     keep &driver loan_id def_flg;
   run;
   
+
   ods output CrossTabFreqs = tmp2;
   proc freq data = tmp;
     table &driver.*def_flg;
   run;
+
   
   data tmp2(keep = &driver rowpercent);
     label rowpercent = "Probability of Default (%)";
@@ -100,7 +136,9 @@ ods powerpoint exclude all;
   title "Univariate Analysis of &n_driver";
   proc univariate data = tmp;
   var &driver;
-  ods select Moments BasicMeasures;
+
+  ods select Moments BasicMeasures ExtremeObs MissingValues;
+
   run;
   title;
   
@@ -118,6 +156,12 @@ ods powerpoint exclude all;
 
 ods powerpoint close;
 
+
+
+proc datasets lib = DATA nolist;
+  delete tmp;
+run;
+
 /*
 ods pdf file = "&p_anly.Summaries.pdf"
         style = Sapphire
@@ -132,9 +176,7 @@ proc means data = &d_comb
   nmiss;
   var &v_comb;
 run;
-
 options orientation = portrait;
-
 title2 "Missing Data Values";
 proc sql;
   select varname "Variable Name", label "Label",
@@ -142,7 +184,6 @@ proc sql;
          countnobs "Percent of Total Observations"
     from tmp;
 quit;
-
 title2 "Frequencies of Last Status";
 footnote j=left "1 = 30 – 59 days; 2 = 60 – 89 days; Sequence continues thereafter for every 30 day period";
 footnote2 j=left "C = Current, or less than 30 days past due; F = Deed-in-Lieu, REO; L = Reperforming Loan Sale;
