@@ -3,8 +3,9 @@
 
 * Setup the head format;
 %let mac_head = 
-                 _HS    date : ddmmyy10.  HS_MDT   _UMP      UMP_MDT
-                 _PPI   PPI_MDT           HPI      _HPI_MDT  _TNF     TNF_MDT
+                 _Rate    date : ddmmyy10.  Rate_MDT   TNF_MDT    GDP    GDP_MDT  
+                 _HS      HS_MDT            _UMP       UMP_MDT    _PPI   PPI_MDT        
+                 _Permits HOP_MDT           _Payroll   HPI        _HPI_MDT      
 ;
 
 * Gernate the URL;
