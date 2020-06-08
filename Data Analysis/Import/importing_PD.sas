@@ -12,7 +12,9 @@
 
 
 * change the value of this macro variable: Q1-Q4;
-%let quater = Q4;
+
+%let quater = Q1;
+
 
 %let y_start = 2016;
 %let y_end = 2017;

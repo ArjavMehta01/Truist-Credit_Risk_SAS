@@ -8,7 +8,9 @@
 %let v_comb = ;
 
 * change the value of this macro variable: Q1-Q4;
-%let quater = Q4;
+
+%let quater = Q1;
+
 
 %let y_start = 2006;
 %let y_end = 2017;

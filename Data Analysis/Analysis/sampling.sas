@@ -3,7 +3,7 @@
 /* Seed: 7919 */
 
 * change the value of this macro variable: Q1-Q4;
-%let quater = Q4;
+%let quater = Q1;
 
 
 
@@ -62,9 +62,7 @@ data DATA.sample_&quater;
   if tran_flg & ^missing(dlq_stat);
 run;
   
-  
-  
-  
+
 
 
 * After getting all the sample dataset;
