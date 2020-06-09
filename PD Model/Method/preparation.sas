@@ -441,7 +441,7 @@ run;
     rename hpi = orig_hpi;
   run;
   
-  proc sort data = PD_DATA.tmp_loan;
+  proc sort data = PD_DATA.tmp_loan tagsort;
     by act_date;
   run;
   
