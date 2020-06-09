@@ -426,7 +426,7 @@ run;
 
   * Merge the loan-level data with macros by date;
   
-  proc sort data = DATA.macros out = PD_DATA.macros;
+  proc sort data = DATA.macros out = work.macros;
     by date;
   run;
   
@@ -436,7 +436,7 @@ run;
   run;
   
   data PD_DATA.tmp_loan;
-    merge PD_DATA.tmp_loan PD_DATA.macros(keep = date hpi rename = (date = orig_dte));
+    merge PD_DATA.tmp_loan work.macros(keep = date hpi rename = (date = orig_dte));
     by orig_dte;
     rename hpi = orig_hpi;
   run;
@@ -446,7 +446,7 @@ run;
   run;
   
   data PD_DATA.data;
-    merge PD_DATA.tmp_loan PD_DATA.macros(rename = (date = act_date));
+    merge PD_DATA.tmp_loan work.macros(rename = (date = act_date));
     by act_date;
     
     if missing(act_upb) then CLTV = oltv;
@@ -455,9 +455,6 @@ run;
     if ^missing(loan_id);
   run;
   
-  proc sort data = PD_DATA.data tagsort;
-    by loan_id act_date;
-  run;
 
 %mend merge;
 
@@ -471,7 +468,7 @@ run;
 %put ----------------------------------------------------------------- DATA GROUPING;
   
 data PD_DATA.cur PD_DATA.del;
-  set PD_DATA.loan;
+  set PD_DATA.data;
   if Curr_stat = "CUR" then output PD_DATA.cur;
   if Curr_stat = "DEL" then output PD_DATA.del;
 run;
