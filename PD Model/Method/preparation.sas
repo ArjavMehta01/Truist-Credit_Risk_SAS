@@ -424,39 +424,29 @@ run;
 
 %macro merge();
 
-  %put DATA GROUPING;
-  
-  data PD_DATA.cur PD_DATA.del;
-    set PD_DATA.loan;
-    if Curr_stat = "CUR" then output PD_DATA.cur;
-    if Curr_stat = "DEL" then output PD_DATA.del;
-  run;
-
-
-
   * Merge the loan-level data with macros by date;
   
-  proc sort data = DATA.macros out = PD_DATA.macros;
+  proc sort data = DATA.macros out = work.macros;
     by date;
   run;
   
   * Creat the orig_hpi for DEL;
-  proc sort data = PD_DATA.del out = PD_DATA.tmp_del;
+  proc sort data = PD_DATA.loan out = PD_DATA.tmp_loan;
     by orig_dte;
   run;
   
-  data PD_DATA.tmp_del;
-    merge PD_DATA.tmp_del PD_DATA.macros(keep = date hpi rename = (date = orig_dte));
+  data PD_DATA.tmp_loan;
+    merge PD_DATA.tmp_loan work.macros(keep = date hpi rename = (date = orig_dte));
     by orig_dte;
     rename hpi = orig_hpi;
   run;
   
-  proc sort data = PD_DATA.tmp_del;
+  proc sort data = PD_DATA.tmp_loan tagsort;
     by act_date;
   run;
   
-  data PD_DATA.del;
-    merge PD_DATA.tmp_del PD_DATA.macros(rename = (date = act_date));
+  data PD_DATA.data;
+    merge PD_DATA.tmp_loan work.macros(rename = (date = act_date));
     by act_date;
     
     if missing(act_upb) then CLTV = oltv;
@@ -465,50 +455,23 @@ run;
     if ^missing(loan_id);
   run;
   
-  proc sort data = PD_DATA.del;
-    by loan_id act_date;
-  run;
-
-
-
-  * Creat the orig_hpi for CUR;
-  proc sort data = PD_DATA.cur out = PD_DATA.tmp_cur;
-    by orig_dte;
-  run;
-  
-  data PD_DATA.tmp_cur;
-    merge PD_DATA.tmp_cur PD_DATA.macros(keep = date hpi rename = (date = orig_dte));
-    by orig_dte;
-    rename hpi = orig_hpi;
-  run;
-  
-  proc sort data = PD_DATA.tmp_cur;
-    by act_date;
-  run;
-  
-  data PD_DATA.cur;
-    merge PD_DATA.tmp_cur PD_DATA.macros(rename = (date = act_date));
-    by act_date;
-    
-    if missing(act_upb) then CLTV = oltv;
-      else CLTV = oltv*(orig_hpi/hpi)*(act_upb/orig_amt);
-      
-    if ^missing(loan_id);
-  run;
-  
-  proc sort data = PD_DATA.cur;
-    by loan_id act_date;
-  run;
 
 %mend merge;
-
-
-
 
 
 * Merging the lona-level and macros data;
 
 %merge();
+
+
+
+%put ----------------------------------------------------------------- DATA GROUPING;
+  
+data PD_DATA.cur PD_DATA.del;
+  set PD_DATA.data;
+  if Curr_stat = "CUR" then output PD_DATA.cur;
+  if Curr_stat = "DEL" then output PD_DATA.del;
+run;
 
 
 

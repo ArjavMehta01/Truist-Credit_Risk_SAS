@@ -9,6 +9,5 @@
 %let d_pd = del;
 
 proc logistic data = PD_DATA.&d_pd;
-  class fico;
-  model next_stat = &var;
+  model next_stat = oltv;
 run;
