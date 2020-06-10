@@ -7,32 +7,71 @@
 ods powerpoint file = "&p_report/_summary.ppt"
                style = Sapphire;
 
-ods graphics on / width=4in height=4in;
+ods graphics on / width=5in height=5in;
+
+options nodate;
+
+ods noproctitle;
+
+* Data Preparation;
+
+%let var = oltv dti cscore_b loan_age curr_rte;
+proc sort data = PD_DATA.data(keep = loan_id &var final_stat) out = uni;
+  by loan_id;
+run;
+
+  
+data tmp;
+  set uni;
+  by loan_id;
+  if first.loan_id;
+  if final_stat = "SDQ" then def_flg = 1;
+    else def_flg = 0;
+  keep &var def_flg;
+run;
+
+
+ods layout gridded rows = 3 columns = 1;
+ods powerpoint exclude none;
+
+title "The logistic regression results of loan-level drivers";
+ods select ParameterEstimates OddsRatios Association;
+proc logistic data = tmp;
+  model def_flg (event = "1") = &var;
+  output out = pdct p = prob xbeta = logit;
+run;
+title;
+
+ods powerpoint exclude all;
+ods layout end;
 
 
 %macro loan_analysis(driver, n_driver);
-
   ods powerpoint exclude all;
-  proc sort data = PD_DATA.data(keep = loan_id &driver final_stat) out = uni;
-    by loan_id;
+  
+  ods layout gridded rows = 3 columns = 1;
+  ods powerpoint exclude none;
+  title "The logistic regression results of &n_driver";
+  ods select ParameterEstimates OddsRatios Association;
+  proc logistic data = tmp;
+    model def_flg (event = "1") = &driver;
+    output out = pdct p = prob xbeta = logit;
   run;
+  title;
+  ods powerpoint exclude all;
+  ods layout end;
   
   
-  data tmp;
-    set uni;
-    by loan_id;
-    if first.loan_id;
-    if final_stat = "SDQ" then def_flg = 1;
-      else def_flg = 0;
-    keep &driver loan_id def_flg;
+  proc sort data = pdct nodupkey;
+    by &driver;
   run;
-  
 
+  
   ods output CrossTabFreqs = tmp2;
   proc freq data = tmp;
     table &driver.*def_flg;
   run;
-
+  
   
   data tmp2(keep = &driver rowpercent);
     label rowpercent = "Probability of Default (%)";
@@ -40,21 +79,23 @@ ods graphics on / width=4in height=4in;
     if def_flg = 1 & _type_ = "11";
   run;
   
-  ods powerpoint exclude none;
-  
-  title "Scatter Plots of PD by &n_driver";
-  proc sgscatter data = tmp2;
-    compare X = &driver Y = rowpercent / grid;
+  data plot;
+    merge tmp2 pdct;
+    prob = prob * 100;
+    by &driver;
   run;
-  title;
   
-/*   title "Univariate Analysis of &n_driver"; */
-/*   proc univariate data = tmp; */
-/*   var &driver; */
-/*   ods select Moments BasicMeasures ExtremeObs MissingValues; */
-/*   run; */
-/*   title; */
+  ods powerpoint exclude none;
+  title "Scatter Plots of PD by &n_driver";
   
+  proc sgplot data = plot;
+    series x = &driver y = prob / lineattrs = (color = "cxe34a33" thickness = 2);
+    scatter x = &driver y = rowpercent;
+    xaxis grid;
+    yaxis grid;
+  run;
+  
+  title;  
   ods powerpoint exclude all;
 %mend loan_analysis;
 
@@ -85,10 +126,10 @@ ods graphics on / width=4in height=4in;
   %loan_analysis(oltv, LTV);
   %loan_analysis(dti, DTI);
   %loan_analysis(cscore_b, FICO);
-  %loan_analysis(fico, FICO2);
+  %loan_analysis(curr_rte, Note Rate);
   %loan_analysis(loan_age, MOB);
   
-  
+  /*
   * Historical PD;
   ods powerpoint exclude all;
   proc sort data = PD_DATA.data(keep = act_date curr_stat) out = uni;
@@ -132,6 +173,7 @@ ods graphics on / width=4in height=4in;
   %macro_analysis(rate_mdt, Rate);
   %macro_analysis(rate, Rate);
   %macro_analysis(tnf_mdt, TNF);
+  */
 %mend scatterloop;
 
 %scatterloop;
