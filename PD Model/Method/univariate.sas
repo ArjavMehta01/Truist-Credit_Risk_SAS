@@ -7,7 +7,7 @@
 ods powerpoint file = "&p_report/_summary.ppt"
                style = Sapphire;
 
-ods graphics on / width=5in height=5in;
+ods graphics on / width=4in height=4in;
 
 options nodate;
 
@@ -15,7 +15,8 @@ ods noproctitle;
 
 * Data Preparation;
 
-%let var = oltv dti cscore_b loan_age curr_rte;
+** For binomial logistic regression;
+%let var = oltv dti cscore_b curr_rte;
 proc sort data = PD_DATA.data(keep = loan_id &var final_stat) out = uni;
   by loan_id;
 run;
@@ -31,36 +32,149 @@ data tmp;
 run;
 
 
-ods layout gridded rows = 3 columns = 1;
+** For multinomial logistic regression;
+proc sort data = PD_DATA.del(keep = &var next_stat) out = mlt;
+  by next_stat;
+run;
+
+
+/* ods layout gridded rows = 1 columns = 1; */
 ods powerpoint exclude none;
 
-title "The logistic regression results of loan-level drivers";
-ods select ParameterEstimates OddsRatios Association;
+title "The binomial logistic regression results of multivariables";
+ods select ParameterEstimates;
 proc logistic data = tmp;
   model def_flg (event = "1") = &var;
   output out = pdct p = prob xbeta = logit;
 run;
 title;
 
-ods powerpoint exclude all;
-ods layout end;
 
+title "The multinomial logistic regression results of multivariables";
+footnote j = l "Dataset: DEL";
+footnote2 j = l "Baseline Category: DEL";
+ods select ParameterEstimates;
+ods output ParameterEstimates = paramest;
+proc logistic data = mlt;
+  class next_stat (ref = "DEL");
+  model next_stat = &var / link = glogit;
+run;
+title;
+footnote;
+
+
+ods powerpoint exclude all;
+/* ods layout end; */
+
+proc sort data = paramest(keep = variable response estimate probchisq);
+  by response;
+run;
+
+data tmp_par;
+  set paramest;
+  esti = cat(estimate, "    (",put(probchisq, pvalue6.4), ")");
+run;
+
+proc transpose data = tmp_par out = paramrep;
+  id variable;
+  by response;
+  var esti;
+run;
+
+
+/* ods layout gridded rows = 1 columns = 1; */
+ods powerpoint exclude none;
+title "The multinomial logistic regression results of multivariables";
+title2 j = r "Estimate";
+title3 j = r "(Pr > ChiSq)";
+footnote j = l "Dataset: DEL";
+footnote2 j = l "Baseline Category: DEL";
+proc report data = paramrep;
+  columns response intercept oltv dti cscore_b curr_rte;
+  define response / display;
+  define oltv / "OLTV";
+  define dti / "DTI";
+  define cscore_b / "FICO";
+  define curr_rte / "Note Rate";
+run;
+title;
+footnote;
+ods powerpoint exclude all;
+/* ods layout end; */
 
 %macro loan_analysis(driver, n_driver);
   ods powerpoint exclude all;
   
-  ods layout gridded rows = 3 columns = 1;
+/*   ods layout gridded rows = 3 columns = 1; */
   ods powerpoint exclude none;
-  title "The logistic regression results of &n_driver";
-  ods select ParameterEstimates OddsRatios Association;
+  title "The binomial logistic regression results of &n_driver";
+  ods select ParameterEstimates;
   proc logistic data = tmp;
     model def_flg (event = "1") = &driver;
     output out = pdct p = prob xbeta = logit;
   run;
   title;
-  ods powerpoint exclude all;
-  ods layout end;
+
   
+  title "The multinomial logistic regression results of &n_driver";
+  footnote j = l "Dataset: DEL";
+  footnote2 j = l "Baseline Category: DEL";
+  ods select ParameterEstimates;
+  ods output ParameterEstimates = paramest;
+  proc logistic data = mlt;
+    class next_stat (ref = "DEL");
+    model next_stat = &driver / link = glogit;
+  run;
+  title;
+  footnote;
+  
+  ods powerpoint exclude all;
+/*   ods layout end; */
+  
+  
+  
+  * Setup for the proc report;
+  proc sort data = paramest(keep = variable response estimate probchisq);
+    by response;
+  run;
+  
+  data tmp_par;
+    set paramest;
+    esti = cat(estimate, "    (",put(probchisq, pvalue6.4), ")");
+  run;
+  
+  proc transpose data = tmp_par out = paramrep;
+    id variable;
+    by response;
+    var esti;
+  run;
+  
+  
+/*   ods layout gridded rows = 1 columns = 1; */
+  ods powerpoint exclude none;
+  title "The multinomial logistic regression results of multivariables";
+  title2 j = r "Estimate";
+  title3 j = r "(Pr > ChiSq)";
+  footnote j = l "Dataset: DEL";
+  footnote2 j = l "Baseline Category: DEL";
+  proc report data = paramrep;
+    columns response intercept oltv dti cscore_b curr_rte;
+    define response / display;
+    define oltv / "OLTV";
+    define dti / "DTI";
+    define cscore_b / "FICO";
+    define curr_rte / "Note Rate";
+  run;
+  title;
+  footnote;
+  ods powerpoint exclude all;
+/*   ods layout end; */
+  
+  
+  
+  
+  
+  * Plot the Estimated PD vs Historical PD;
   
   proc sort data = pdct nodupkey;
     by &driver;
@@ -123,13 +237,12 @@ ods layout end;
 
 
 %macro scatterloop;
-  %loan_analysis(oltv, LTV);
+  %loan_analysis(oltv, Original LTV);
   %loan_analysis(dti, DTI);
   %loan_analysis(cscore_b, FICO);
   %loan_analysis(curr_rte, Note Rate);
-  %loan_analysis(loan_age, MOB);
   
-  /*
+
   * Historical PD;
   ods powerpoint exclude all;
   proc sort data = PD_DATA.data(keep = act_date curr_stat) out = uni;
@@ -163,17 +276,11 @@ ods layout end;
   ods powerpoint exclude all;
   
   
-  %macro_analysis(hs_mdt, HS);
   %macro_analysis(hs, HS);
-  %macro_analysis(ump_mdt, UMP);
   %macro_analysis(ump, UMP);
-  %macro_analysis(ppi_mdt, PPI);
   %macro_analysis(ppi, PPI);
   %macro_analysis(gdp, GDP);
-  %macro_analysis(rate_mdt, Rate);
-  %macro_analysis(rate, Rate);
-  %macro_analysis(tnf_mdt, TNF);
-  */
+
 %mend scatterloop;
 
 %scatterloop;

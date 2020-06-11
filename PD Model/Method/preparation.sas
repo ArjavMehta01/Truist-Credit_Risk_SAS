@@ -68,6 +68,8 @@ run;
       _def = 0;
     end;
     
+    if _def then delete;
+    
     if ^_def then do;
       if dlq_stat = 0 then
         Curr_stat = "CUR";
@@ -79,6 +81,12 @@ run;
     end;
     if _def then Curr_stat = "SDQ";
   run;
+  
+  
+/*   proc print data = PD_DATA.loan (obs = 1000); */
+/*     var loan_id Curr_stat _def; */
+/*     where Curr_stat = "SDQ"; */
+/*   run; */
   
   data PD_DATA.loan(drop = _:);
     merge PD_DATA.loan tmp_id(firstobs = 2);
@@ -133,7 +141,7 @@ run;
 
 * UN-comment this code to run the prepration function;
 
-/* %prep() */
+%prep()
 
 
 
@@ -430,7 +438,7 @@ run;
     by date;
   run;
   
-  * Creat the orig_hpi for DEL;
+  * Creat the orig_hpi;
   proc sort data = PD_DATA.loan out = PD_DATA.tmp_loan;
     by orig_dte;
   run;
@@ -459,9 +467,10 @@ run;
 %mend merge;
 
 
+
 * Merging the lona-level and macros data;
 
-%merge();
+/* %merge(); */
 
 
 
