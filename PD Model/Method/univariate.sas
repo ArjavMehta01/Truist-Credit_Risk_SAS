@@ -276,10 +276,10 @@ ods powerpoint exclude all;
   ods powerpoint exclude all;
   
   
-  %macro_analysis(hs, HS);
-  %macro_analysis(ump, UMP);
-  %macro_analysis(ppi, PPI);
-  %macro_analysis(gdp, GDP);
+  %macro_analysis(hs, Housing Starts);
+  %macro_analysis(ump, Unemployment Rate);
+  %macro_analysis(ppi, Producer Price Index);
+  %macro_analysis(gdp, Gross Domestic Product);
 
 %mend scatterloop;
 
