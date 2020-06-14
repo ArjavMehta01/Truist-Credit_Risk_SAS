@@ -7,14 +7,14 @@
 ods powerpoint file = "&p_report/_summary.ppt"
                style = Sapphire;
 
-ods graphics on / width=4in height=4in;
+ods graphics on / width = 5in height = 5in;
 
 options nodate;
 
 ods noproctitle;
 
 * Data Preparation;
-/*
+
 ** For binomial logistic regression;
 %let var = oltv dti cscore_b curr_rte;
 
@@ -30,7 +30,7 @@ data tmp;
     else def_flg = 0;
   keep &var def_flg;
 run;
-*/
+
 
 %let var = oltv dti curr_rte loan_age hs ump ppi gdp;
 data tmp_p tmp_s;
@@ -46,7 +46,7 @@ data tmp_p tmp_s;
   if fico = "Prime" then output tmp_p;
   if fico = "Sub-Prime" then output tmp_s;
 run;
-
+/*
 ** For multinomial logistic regression;
 proc sort data = PD_DATA.del(keep = &var next_stat fico) out = mlt;
   by next_stat;
@@ -54,7 +54,7 @@ run;
 
 
 /* ods layout gridded rows = 1 columns = 1; */
-ods powerpoint exclude none;
+/* ods powerpoint exclude none; */
 
 /* title "The Binomial Logistic Regression Results of Multivariables"; */
 /* ods select ParameterEstimates; */
@@ -64,64 +64,65 @@ ods powerpoint exclude none;
 /* title; */
 
 
-title "The Multinomial Logistic Regression";
-footnote j = l "Dataset: DEL";
-footnote2 j = l "Baseline Category: DEL";
-ods select ParameterEstimates;
-ods output ParameterEstimates = paramest;
-proc logistic data = mlt;
-  class next_stat (ref = "DEL") fico (ref = "Prime") / param = glm;
-  model next_stat = fico &var / link = glogit;
-  lsmeans fico / e ilink cl;
-run;
-title;
-footnote;
+/* title "The Multinomial Logistic Regression"; */
+/* footnote j = l "Dataset: DEL"; */
+/* footnote2 j = l "Baseline Category: DEL"; */
+/* ods select ModelANOVA Coef LSMeans; */
+/* ods output ParameterEstimates = paramest; */
+/* ods trace on; */
+/* proc logistic data = mlt; */
+/*   class next_stat (ref = "DEL") fico (ref = "Prime") / param = glm; */
+/*   model next_stat = fico &var / link = glogit; */
+/*   lsmeans fico / e ilink cl; */
+/* run; */
+/* title; */
+/* footnote; */
 
 
-ods powerpoint exclude all;
+/* ods powerpoint exclude all; */
 /* ods layout end; */
-
-proc sort data = paramest(keep = variable response estimate probchisq);
-  by response;
-run;
-
-
-data tmp_par;
-  set paramest;
-  esti = cat(estimate, "    (",put(probchisq, pvalue6.4), ")");
-run;
-
-proc transpose data = tmp_par out = paramrep;
-  id variable;
-  by response;
-  var esti;
-run;
+/*  */
+/* proc sort data = paramest(keep = variable response estimate probchisq); */
+/*   by response; */
+/* run; */
+/*  */
+/*  */
+/* data tmp_par; */
+/*   set paramest; */
+/*   esti = cat(estimate, "    (",put(probchisq, pvalue6.4), ")"); */
+/* run; */
+/*  */
+/* proc transpose data = tmp_par out = paramrep; */
+/*   id variable; */
+/*   by response; */
+/*   var esti; */
+/* run; */
 
 
 /* ods layout gridded rows = 1 columns = 1; */
 
 /* ods powerpoint exclude none; */
-title "The Multinomial Logistic Regression Results";
-title2 j = r "Estimate";
-title3 j = r "(Pr > ChiSq)";
-footnote j = l "Dataset: DEL";
-footnote2 j = l "Baseline Category: DEL";
-proc report data = paramrep;
-  columns response intercept oltv dti cscore_b curr_rte loan_age hs ump ppi gdp;
-  define response / display;
-  define oltv / "OLTV";
-  define dti / "DTI";
-  define cscore_b / "FICO";
-  define curr_rte / "Note Rate";
-  define loan_age / "Month on Books";
-  define hs / "Housing Starts";
-  define ump / "Unemployment Rate";
-  define ppi / "Producer Price Index";
-  define gdp / "GDP";
-run;
-title;
-footnote;
-ods powerpoint exclude all;
+/* title "The Multinomial Logistic Regression Results"; */
+/* title2 j = r "Estimate"; */
+/* title3 j = r "(Pr > ChiSq)"; */
+/* footnote j = l "Dataset: DEL"; */
+/* footnote2 j = l "Baseline Category: DEL"; */
+/* proc report data = paramrep; */
+/*   columns response intercept oltv dti cscore_b curr_rte loan_age hs ump ppi gdp; */
+/*   define response / display; */
+/*   define oltv / "OLTV"; */
+/*   define dti / "DTI"; */
+/*   define cscore_b / "FICO"; */
+/*   define curr_rte / "Note Rate"; */
+/*   define loan_age / "Month on Books"; */
+/*   define hs / "Housing Starts"; */
+/*   define ump / "Unemployment Rate"; */
+/*   define ppi / "Producer Price Index"; */
+/*   define gdp / "GDP"; */
+/* run; */
+/* title; */
+/* footnote; */
+/* ods powerpoint exclude all; */
 /* ods layout end; */
 
 %macro loan_analysis(driver, n_driver);
@@ -247,30 +248,39 @@ ods powerpoint exclude all;
   run;
   
   ods powerpoint exclude none;
-  title "Scatter Plots of PD by &n_driver";
-  title2 j = l "               Group: Prime";
+  
+  *title "Binomial Logistic Regression on &n_driver";
+  title2 j = l "Group: Prime";
+  footnote j = l "Current State: DEL and Next State: SDQ";
   proc sgplot data = plot_p;
     series x = &driver y = prob / lineattrs = (color = "cxe34a33" thickness = 2);
     scatter x = &driver y = rowpercent;
     inset ("Estimate" = "&est_p"
            "Pr > Chi-Square" = "&pva_p") / border opaque;
     xaxis grid;
-    yaxis grid;
+    yaxis grid max = 30;
+    discretelegend / ACROSS = 2;
   run;
   title;
+  footnote;
   
-  title "Scatter Plots of PD by &n_driver";
-  title2 j = l "               Group: Sub-Prime";
+  
+  *title "Binomial Logistic Regression on &n_driver";
+  title2 j = l "Group: Sub-Prime";
+  footnote j = l "Current State: DEL and Next State: SDQ";
   proc sgplot data = plot_s;
     series x = &driver y = prob / lineattrs = (color = "cxe34a33" thickness = 2);
     scatter x = &driver y = rowpercent;
     inset ("Estimate" = "&est_s"
            "Pr > Chi-Square" = "&pva_s") / border opaque;
     xaxis grid;
-    yaxis grid;
+    yaxis grid max = 30;
+    *discretelegend / ACROSS = 2;
   run;
+  title;
+  footnote;
   
-  title;  
+  
   ods powerpoint exclude all;
 %mend loan_analysis;
 
@@ -288,7 +298,7 @@ ods powerpoint exclude all;
   run;
   
   ods powerpoint exclude none;
-  title "Scatter Plots of PD by &n_driver";
+  title "Binomial Logistic Regression by &n_driver";
   proc sgscatter data = tmp;
     compare X = &driver Y = rowpercent / grid;
   run;
