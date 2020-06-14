@@ -1,8 +1,8 @@
 /* Author: Jonas */
 /* Purpose: Univariate analysis for all variables */
 
-
-
+%let p_work = %sysfunc(cat(&p_local,/PD Model/Work/));
+libname PD_TMP "&p_work";
 
 ods powerpoint file = "&p_report/_summary2.ppt"
                style = Sapphire;
@@ -16,8 +16,8 @@ ods noproctitle;
 
 
 %let var = oltv dti curr_rte loan_age hs ump ppi gdp;
-data tmp_p tmp_s;
-  set PD_DATA.cur;
+data PD_TMP.tmp_p PD_TMP.tmp_s;
+  set PD_DATA.cur(keep = &var fico next_stat);
   label hs = "Housing Starts"
         ump = "Unemployment Rate"
         ppi = "Producer Price Index"
@@ -26,8 +26,8 @@ data tmp_p tmp_s;
   if next_stat = "DEL" then def_flg = 1;
     else def_flg = 0;
   keep &var def_flg fico;
-  if fico = "Prime" then output tmp_p;
-  if fico = "Sub-Prime" then output tmp_s;
+  if fico = "Prime" then output PD_TMP.tmp_p;
+  if fico = "Sub-Prime" then output PD_TMP.tmp_s;
 run;
 /*
 ** For multinomial logistic regression;
@@ -70,12 +70,12 @@ run;
 /* run; */
 /*  */
 /*  */
-/* data tmp_par; */
+/* data PD_TMP.tmp_par; */
 /*   set paramest; */
 /*   esti = cat(estimate, "    (",put(probchisq, pvalue6.4), ")"); */
 /* run; */
 /*  */
-/* proc transpose data = tmp_par out = paramrep; */
+/* proc transpose data = PD_TMP.tmp_par out = paramrep; */
 /*   id variable; */
 /*   by response; */
 /*   var esti; */
@@ -110,24 +110,23 @@ run;
 
 %macro loan_analysis(driver, n_driver);
   ods powerpoint exclude all;
-  
-  
+
 /*   ods layout gridded rows = 3 columns = 1; */
 /*   ods powerpoint exclude none; */
   title "The Binomial Logistic Regression Results of &n_driver";
   title2 "Prime";
   ods output ParameterEstimates = param_p;
-  proc logistic data = tmp_p;
+  proc logistic data = PD_TMP.tmp_p;
     model def_flg (event = "1") = &driver;
-    output out = pdct_p p = prob xbeta = logit;
+    output out = PD_TMP.pdct_p p = prob xbeta = logit;
   run;
   title;
 
   title2 "Sub-Prime";
   ods output ParameterEstimates = param_s;
-  proc logistic data = tmp_s;
+  proc logistic data = PD_TMP.tmp_s;
     model def_flg (event = "1") = &driver;
-    output out = pdct_s p = prob xbeta = logit;
+    output out = PD_TMP.pdct_s p = prob xbeta = logit;
   run;
   title;
   
@@ -169,12 +168,12 @@ run;
     by response;
   run;
   
-  data tmp_par;
+  data PD_TMP.tmp_par;
     set paramest;
     esti = cat(estimate, "    (",put(probchisq, pvalue6.4), ")");
   run;
   
-  proc transpose data = tmp_par out = paramrep;
+  proc transpose data = PD_TMP.tmp_par out = paramrep;
     id variable;
     by response;
     var esti;
@@ -187,45 +186,45 @@ run;
   
   * Plot the Estimated PD vs Historical PD;
   
-  proc sort data = pdct_p nodupkey;
+  proc sort data = PD_TMP.pdct_p nodupkey;
     by &driver;
   run;
-  proc sort data = pdct_s nodupkey;
+  proc sort data = PD_TMP.pdct_s nodupkey;
     by &driver;
   run;
 
   
   ods output CrossTabFreqs = tmp2_p;
-  proc freq data = tmp_p;
+  proc freq data = PD_TMP.tmp_p;
     table &driver.*def_flg;
   run;
   
   ods output CrossTabFreqs = tmp2_s;
-  proc freq data = tmp_s;
+  proc freq data = PD_TMP.tmp_s;
     table &driver.*def_flg;
   run;
   
   
   data tmp2_p(keep = &driver rowpercent);
-    label rowpercent = "Probability of Default (%)";
+    label rowpercent = "Probability(%)";
     set tmp2_p;
     if def_flg = 1 & _type_ = "11";
   run;
   
   data tmp2_s(keep = &driver rowpercent);
-    label rowpercent = "Probability of Default (%)";
+    label rowpercent = "Probability(%)";
     set tmp2_s;
     if def_flg = 1 & _type_ = "11";
   run;
   
   data plot_s;
-    merge tmp2_s pdct_s;
+    merge tmp2_s PD_TMP.pdct_s;
     prob = prob * 100;
     by &driver;
   run;
   
   data plot_p;
-    merge tmp2_p pdct_p;
+    merge tmp2_p PD_TMP.pdct_p;
     prob = prob * 100;
     by &driver;
   run;
@@ -398,6 +397,7 @@ proc freq data = tmp;
 run;
 
 */
-
+proc datasets lib = PD_TMP kill;
+run;
 
 

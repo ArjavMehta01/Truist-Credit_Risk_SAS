@@ -407,14 +407,15 @@ run;
 proc sort data = tmp nodupkey;
   by loan_id;
 run;
+*/
 
-
-proc freq data = tmp;
-  tables fico1*next_stat / chisq;
-  tables fico2*next_stat / chisq;
+proc freq data = PD_DATA.cur;
+  tables fico*next_stat;
+run;
+proc freq data = PD_DATA.del;
+  tables fico*next_stat;
 run;
 
-*/
 
 
 

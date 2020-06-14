@@ -4,7 +4,6 @@
 
 %let var = oltv dti curr_rte loan_age hs ump ppi gdp;
 
-
 %macro fit(d_pd);
   * Data For multinomial logistic regression;
   proc sort data = PD_DATA.&d_pd(keep = &var next_stat fico) out = mlt;
