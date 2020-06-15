@@ -60,13 +60,19 @@ run;
     attrib Curr_stat length = $3.
                      label = "Current State"
                      ;
-                      
+    
+    
+    
     by loan_id;
     retain _def 0;
+    retain _start;
     
     if first.loan_id then do;            
       _def = 0;
+      _start = loan_age;
     end;
+    
+    if _def then delete;
     
     if ^_def then do;
       if dlq_stat = 0 then
@@ -78,7 +84,17 @@ run;
       else _def = 1;
     end;
     if _def then Curr_stat = "SDQ";
+    
+    if mod(loan_age - _start, 3) = 0 then output PD_DATA.loan tmp_id;
+      else if last.loan_id then output PD_DATA.loan tmp_id;
+    
   run;
+  
+  
+/*   proc print data = PD_DATA.loan (obs = 1000); */
+/*     var loan_id Curr_stat _def; */
+/*     where Curr_stat = "SDQ"; */
+/*   run; */
   
   data PD_DATA.loan(drop = _:);
     merge PD_DATA.loan tmp_id(firstobs = 2);
@@ -109,18 +125,10 @@ run;
     merge PD_DATA.loan _final;
     by loan_id;
     length fico $10;
-    if 0 < cscore_b < 620 then
-      fico = '[0-620)';
-    if 620 <=cscore_b < 660 then
-      fico = '[620-660)';
-    if 660 <=cscore_b < 700 then
-      fico = '[660-700)';
-    if 700 <=cscore_b < 740 then
-      fico = '[700-740)';
-    if 740 <=cscore_b < 780 then
-      fico = '[740-780)';
-    if 780 <=cscore_b then
-      fico = '[780+)';
+    if 0 < cscore_b < 670 then
+      fico = 'Sub-Prime';
+    if 670 <=cscore_b then
+      fico = 'Prime';
     
     drop dlq_stat zb_code;
   run;
@@ -133,7 +141,7 @@ run;
 
 * UN-comment this code to run the prepration function;
 
-/* %prep() */
+%prep()
 
 
 
@@ -430,7 +438,7 @@ run;
     by date;
   run;
   
-  * Creat the orig_hpi for DEL;
+  * Creat the orig_hpi;
   proc sort data = PD_DATA.loan out = PD_DATA.tmp_loan;
     by orig_dte;
   run;
@@ -459,9 +467,10 @@ run;
 %mend merge;
 
 
+
 * Merging the lona-level and macros data;
 
-%merge();
+/* %merge(); */
 
 
 
@@ -469,6 +478,7 @@ run;
   
 data PD_DATA.cur PD_DATA.del;
   set PD_DATA.data;
+  if ^missing(next_stat);
   if Curr_stat = "CUR" then output PD_DATA.cur;
   if Curr_stat = "DEL" then output PD_DATA.del;
 run;

@@ -3,7 +3,7 @@
 /* Seed: 7919 */
 
 * change the value of this macro variable: Q1-Q4;
-%let quater = Q1;
+%let quarter = Q1;
 
 
 
@@ -22,7 +22,7 @@ data id_input;
   keep id;
 run;
 
-
+*/
 proc surveyselect data = id_input
   outall
   noprint
@@ -51,13 +51,13 @@ proc sort data = id_sample;
   by loan_id;
 run;
 
-proc sort data = DATA.combined_&quater tagsort;
+proc sort data = DATA.combined_&quarter tagsort;
   by loan_id;
 run;
 
 
-data DATA.sample_&quater;
-  merge DATA.combined_&quater id_sample;
+data DATA.sample_&quarter;
+  merge DATA.combined_&quarter id_sample;
   by loan_id;
   if tran_flg & ^missing(dlq_stat);
 run;
