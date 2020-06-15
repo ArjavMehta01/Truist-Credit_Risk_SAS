@@ -26,3 +26,17 @@
 
 %fit(DEL);
 %fit(CUR);
+
+
+/*
+
+
+proc print data = PD_DATA.cur;
+  where next_stat = "SDQ";
+run;
+
+proc print data = DATA.sample;
+  where loan_id = "623301207056";
+run;
+
+*/
