@@ -179,6 +179,14 @@
   run;
 
 
+  data &outfile..comb_&date;
+    merge &outfile..comb_&date id_sample;
+    by loan_id;
+    if tran_flg & ^missing(dlq_stat);
+    drop seller;
+  run;
+  
+
 %if ^&keep %then %do;
   proc datasets library = ACQ nolist;
     delete acq_&date;
@@ -200,6 +208,22 @@
 %acq(2005Q1, work)
 %perf(2005Q1, work, &o_test)
 */
+
+
+********************;
+** sample loan_id **;
+********************;
+* select the data based on loan_id;
+filename ACQid "&p_data/ACQ_IDsample.csv";
+
+data id_sample;
+  infile ACQid dsd firstobs = 2;
+  input tran_flg loan_id:$12.;
+run;
+
+proc sort data = id_sample;
+  by loan_id;
+run;
 
 
 *****************************;

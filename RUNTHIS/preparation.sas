@@ -3,7 +3,6 @@
 /* Purpose2: Generate quarterly data and state variables*/
 
 
-
 %put ------------------------------------------------------------------OPTION1;
 * change the value of this macro variable: Q1-Q4;
 %let quarter = Q1;
@@ -20,7 +19,7 @@
 %let d_comb =;
 %macro get_name();
   %do i = &y_start %to &y_end;
-    %let d_comb = &d_comb COMB.comb_&i.&quater;
+    %let d_comb = &d_comb COMB.comb_&i.&quarter;
   %end;
 %mend get_name;
 
@@ -29,36 +28,17 @@
 %put Using data sets: &d_comb;
 
 * concatenate data sets;
-data DATA.combined_&quater;
-  set &d_comb;
-  drop seller;
-run;
-
-* select the data based on loan_id;
-filename ACQid "&p_data/ACQ_IDsample.csv";
-
-data id_sample;
-  infile ACQid dsd firstobs = 2;
-  input tran_flg loan_id:$12.;
-run;
-
-proc sort data = id_sample;
-  by loan_id;
-run;
-
-proc sort data = DATA.combined_&quarter tagsort;
-  by loan_id;
-run;
-
-
 data DATA.sample_&quarter;
-  merge DATA.combined_&quarter id_sample;
-  by loan_id;
-  if tran_flg & ^missing(dlq_stat);
+  set &d_comb;
 run;
-  
-  
+
+
+
 * Prepare the data: create a new status variable;
+proc sort data = DATA.sample_&quarter tagsort;
+  by loan_id;
+run;
+
 data DATA.sample_&quarter tmp_id(keep = loan_id curr_stat 
                                  rename = (loan_id = _id curr_stat = Next_stat)
                                  );
@@ -101,6 +81,7 @@ data DATA.sample_&quarter(drop = _:);
                    label = "Next State"
                    ;
   if loan_id ne _id then next_stat = "";
+  drop tran_flg;
 run;
 
 
