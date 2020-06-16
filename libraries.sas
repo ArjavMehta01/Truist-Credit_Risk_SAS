@@ -1,21 +1,21 @@
-/* Author: Group B */
+/* Author: NIshang */
 /* Purpose: library file for local path */
 
   
-%let p_local = /folders/myfolders/GitHub/Truist-Credit_Risk_SAS;
+%let p_local = /folders/myfolders;
 
   
-%let p_anly = %sysfunc(cat(&p_local,/Data Analysis/));
-%let p_report = %sysfunc(cat(&p_local,/Report/));
+%let p_anly = %sysfunc(cat(&p_local,/Truist-Credit_Risk_SAS/Data Analysis/));
+%let p_report = %sysfunc(cat(&p_local,/Git/Report/));
 
-%let p_data = %sysfunc(cat(&p_local,/Data/));
-  %let p_acq = %sysfunc(cat(&p_local,/Data/Acquisition/));
-  %let p_perf = %sysfunc(cat(&p_local,/Data/Performance/));
-  %let p_comb = %sysfunc(cat(&p_local,/Data/Combine/));
+%let p_data = %sysfunc(cat(&p_local,/Git/Data/));
+  %let p_acq = %sysfunc(cat(&p_data,/Acquisition/));
+  %let p_perf = %sysfunc(cat(&p_data,/Performance/));
+  %let p_comb = %sysfunc(cat(&p_data,/Combine/));
 
-%let p_pd = %sysfunc(cat(&p_local,/PD Model/));
-  %let p_pddata = %sysfunc(cat(&p_local,/PD Model/Data/));
-  %let p_pdres = %sysfunc(cat(&p_local,/PD Model/Result/));
+%let p_pd = %sysfunc(cat(&p_local,/Truist-Credit_Risk_SAS/PD Model/));
+  %let p_pddata = %sysfunc(cat(&p_local,/Truist-Credit_Risk_SAS/PD Model/Data/));
+  %let p_pdres = %sysfunc(cat(&p_local,/Truist-Credit_Risk_SAS/PD Model/Result/));
 
 
 libname TRUIST_B "&p_local";
