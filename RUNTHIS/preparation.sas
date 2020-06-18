@@ -1,11 +1,11 @@
-/* Author: Zheng */
+/* Author: Zheng/Nishang */
 /* Purpose1: Merge data sets for each quarter and generate the traning sample*/
 /* Purpose2: Generate quarterly data and state variables*/
 
 
 %put ------------------------------------------------------------------OPTION1;
 * change the value of this macro variable: Q1-Q4;
-%let quarter = Q1;
+%let quarter = Q2;
 
 %put ------------------------------------------------------------------OPTION2;
 * year range;

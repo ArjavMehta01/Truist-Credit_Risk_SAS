@@ -1,4 +1,4 @@
-/* Author: Zheng */
+/* Author: Zheng/Nishang */
 /* Purpose: Import Loan performance data from LOCAL Path */
 
 
@@ -13,7 +13,7 @@
 
 %put ------------------------------------------------------------------OPTION3;
 * change the value of this macro variable: Q1-Q4;
-%let quarter = Q1;
+%let quarter = Q2;
 
 %put ------------------------------------------------------------------OPTION4;
 * year range;
