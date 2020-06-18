@@ -13,12 +13,12 @@
 
 %put ------------------------------------------------------------------OPTION3;
 * change the value of this macro variable: Q1-Q4;
-%let quarter = Q1;
+%let quarter = Q3;
 
 %put ------------------------------------------------------------------OPTION4;
 * year range;
-%let y_start = 2006;
-%let y_end = 2017;
+%let y_start = 2008;
+%let y_end = 2008;
 
 
 
@@ -30,7 +30,7 @@
                 cscore_b          fthb_flg :$1.     purpose :$1. 
                 prop_typ :$2.     num_unit          occ_stat :$1.
                 state :$2.        zip_3 :$3.        mi_pct 
-                x_prod_type :$3.  cscore_c          mi_type 
+                product :$3.      cscore_c          mi_type 
                 relo_flg :$1. 
                 ;
               
@@ -123,7 +123,7 @@
     *date conversion;
     format orig_dte frst_pay mmddyy8.;
     orig_dte = mdy(input(substr(x_orig_date,1,2),2.),1,input(substr(x_orig_date,4,4),4.)); 
-    
+    frst_pay = mdy(input(substr(x_first_pay, 1, 2), 2.), 1, input(substr(x_first_pay, 4, 4), 4.));
 /*     where seller contains "&bank"; */
     *keep loan_id seller orig_rt orig_amt orig_dte oltv dti cscore_b;
   run;
@@ -233,13 +233,17 @@ run;
 %macro importloop(q);
   %do y_id = &y_start %to &y_end;
     %acq(&y_id&q, ACQ)
-    %perf(&y_id&q, ACT)
-    %comb(&y_id&q, COMB)
+/*     %perf(&y_id&q, ACT) */
+/*     %comb(&y_id&q, COMB) */
   %end;
 %mend importloop;
 
 
 %importloop(&quarter)
 
+;
+proc freq data = ACQ.acq_2008q3;
+  table product;
+ run;
 
   

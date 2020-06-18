@@ -4,13 +4,13 @@
 
 options nodate;
 /*
-
+options nodate;
 ods pdf file = "&p_report.Contents.pdf"
         style = Sapphire;
 
 title "Content Table";
 
-proc contents data = DATA.sample varnum;
+proc contents data = DATA.loan varnum;
 
   ods select Position;
   ods output Position = content;
