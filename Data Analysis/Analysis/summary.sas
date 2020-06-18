@@ -1,17 +1,17 @@
 /* Author: Jonas */
-/* Purpose: Example of Statistics analysis on 2005Q1 data */
 
-%let _date = 2005Q1;
-%let d_comb = COMB.COMB_&_date;
-%let v_comb = orig_amt oltv cscore_b dti last_upb;
+/* Purpose: Example of Statistics analysis on sample data */
 
 options nodate;
-
-ods pdf file = "&p_data.Contents.pdf"
+/*
+options nodate;
+ods pdf file = "&p_report.Contents.pdf"
         style = Sapphire;
 
 title "Content Table";
-proc contents data = &d_comb varnum;
+
+proc contents data = DATA.loan varnum;
+
   ods select Position;
   ods output Position = content;
 run;
@@ -19,48 +19,156 @@ title;
 
 ods pdf close;
 
-/*
-● Unpaid Balance (UPB)
-● LTV
-● Loan Age
-● Remaining Until Maturity
-● Interest Rate
-● Delinquency Status
-● Debt-to-Income (DTI)
 */
 
-ods output MissingValues = miss_value;
-proc univariate data = &d_comb;
-  var &v_comb;
+* prepare data for calculating PD;
+data DATA.tmp;
+  set DATA.sample;
+  label def_flg = "Default Flag";
+  if missing(dlq_stat) then delete;
+  else do;
+    if dlq_stat < 3 then def_flg = 0;
+    else if dlq_stat = 999 and (nmiss(zb_code) or zb_code in ("01" "06")) then def_flg = 0;
+    else def_flg = 1;
+  end;
 run;
 
-data content(rename = (variable = varname));
-  set content(keep = variable label);
+proc sort data = DATA.tmp;
+  by loan_id descending def_flg;
 run;
 
-proc sort data = content;
-  by varname;
+* PD time series scatter plot;
+ods output CrossTabFreqs = tmp;
+proc freq data = DATA.tmp;
+  table act_date*def_flg;
+run;
+
+data tmp(keep = act_date rowpercent);
+  set tmp;
+  label rowpercent = "Probability of Default(%)";
+
+
+* change the value of this macro variable: Q1-Q4;
+%let quater = Q1;
+
+%let d_comb = DATA.sample_&quater;
+/* %let d_comb = DATA.sample_Q1 DATA.sample_Q2 DATA.sample_Q3 DATA.sample_Q4 */
+
+%let v_comb = loan_id oltv dti cscore_b act_date orig_amt act_upb loan_age dlq_stat zb_code;
+
+
+* prepare data for calculating PD;
+data DATA.tmp;
+  set &d_comb;
+  label def_flg = "Default Flag";
+  if missing(dlq_stat) then delete;
+  else do;
+    if dlq_stat < 3 then def_flg = 0;
+    else if dlq_stat = 999 and (nmiss(zb_code) or zb_code in ("01" "06")) then def_flg = 0;
+    else def_flg = 1;
+  end;
+  keep &v_comb def_flg;
+run;
+
+proc sort data = DATA.tmp;
+  by loan_id descending def_flg;
+run;
+
+* PD time series scatter plot;
+ods output CrossTabFreqs = tmp;
+proc freq data = DATA.tmp;
+  table act_date*def_flg;
+run;
+
+data tmp(keep = act_date rowpercent);
+  set tmp;
+  label rowpercent = "Probability of Default (%)";
+  if def_flg = 1 & _type_ = "11";
 run;
 
 
-proc sort data = miss_value;
-  by varname;
+
+ods powerpoint file = "&p_report/_summary.ppt"
+
+               style = Sapphire;
+
+ods graphics on / width=4in height=4in;
+
+title "Scatter Plots of PD";
+proc sgscatter data = tmp;
+  compare X = act_date Y = rowpercent / grid;
+run;
+title;
+
+ods powerpoint exclude all;
+
+
+%macro pd_scatter(driver, n_driver);
+
+  data tmp;
+    set DATA.tmp;
+    by loan_id;
+    if first.loan_id;
+    keep &driver loan_id def_flg;
+  run;
+  
+
+  ods output CrossTabFreqs = tmp2;
+  proc freq data = tmp;
+    table &driver.*def_flg;
+  run;
+
+  
+  data tmp2(keep = &driver rowpercent);
+    label rowpercent = "Probability of Default (%)";
+    set tmp2;
+    if def_flg = 1 & _type_ = "11";
+  run;
+  
+  ods powerpoint exclude none;
+  
+  title "Scatter Plots of PD by &n_driver";
+  proc sgscatter data = tmp2;
+    compare X = &driver Y = rowpercent / grid;
+  run;
+  title;
+  
+  title "Univariate Analysis of &n_driver";
+  proc univariate data = tmp;
+  var &driver;
+
+  ods select Moments BasicMeasures ExtremeObs MissingValues;
+
+  run;
+  title;
+  
+  ods powerpoint exclude all;
+%mend pd_scatter;
+
+
+%macro scatterloop;
+  %pd_scatter(oltv, LTV);
+  %pd_scatter(dti, DTI);
+  %pd_scatter(cscore_b, FICO);
+%mend scatterloop;
+
+%scatterloop;
+
+ods powerpoint close;
+
+
+
+proc datasets lib = DATA nolist;
+  delete tmp;
 run;
 
-data tmp;
-  merge miss_value(keep = varname count countnobs
-                   in = miss)
-        content;
-  by varname;
-  if miss;
-run;
-
-ods pdf file = "&p_data.Summaries.pdf"
+/*
+ods pdf file = "&p_anly.Summaries.pdf"
         style = Sapphire
         startpage = never;
 options orientation = landscape;
 
-title "Statistics Summaries of &_date Data";
+title "Statistics Summaries of &quater data (firm = &bank)";
 
 proc means data = &d_comb
   min mean median mode max std range
@@ -68,9 +176,7 @@ proc means data = &d_comb
   nmiss;
   var &v_comb;
 run;
-
 options orientation = portrait;
-
 title2 "Missing Data Values";
 proc sql;
   select varname "Variable Name", label "Label",
@@ -78,149 +184,16 @@ proc sql;
          countnobs "Percent of Total Observations"
     from tmp;
 quit;
-
 title2 "Frequencies of Last Status";
+footnote j=left "1 = 30 – 59 days; 2 = 60 – 89 days; Sequence continues thereafter for every 30 day period";
+footnote2 j=left "C = Current, or less than 30 days past due; F = Deed-in-Lieu, REO; L = Reperforming Loan Sale;
+ N = Note Sale; P = Prepaid or Matured; R = Repurchased; S = Short Sale; T = Third Party Sale; X = missing";
 proc freq data = &d_comb;
   tables last_stat;
 run;
 title;
+footnote;
 ods pdf close;
 
-
-
-  %let id01 = %nrstr(1YqgLuVYbwK8LQGL05yiDLzt-PchZN751);
-  %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id01;
-  filename url_file url "&_url";
-  
-  data Housing_Starts;
-    infile url_file  missover dsd firstobs=2;
-    input date :$10. HousingSt_Var;
-    logvar = log(HousingSt_Var);
-  run;
-  
-  
-proc univariate data = Housing_Starts normal  ; 
-histogram HousingSt_Var / normal;
-run;
-
-proc means data = Housing_Starts
-  min mean median mode max std range
-  maxdec = 0
-  nmiss;
-  var HousingSt_Var;
-run;
-
-   
-  %let id05 = %nrstr(1iDdiHWP7ihEtEh1zED3XQup0ksdNmK_J);
-  %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id05;
-  filename url_file url "&_url";
-  
-  data TNFPayrolls ( drop = lagvar1   lagvar12 );
-  	infile url_file missover dsd;
-  	input date :$10. Payrolls;
-  	label 
-  	logP = "Log Transformation"
-  	MGT = "Monthly Growth Transformation"
-  	AGT = "Annual Growth Transformation"
-  	MRT = "Monthly Return Transformation"
-  	ART = "Annual Return Transformation"
-  	MDT = "Monthly Difference Transformation"
-  	pctchng = "Percetnage Change"
-  	AnnualGrowth = "Annual Growth in Percent"
-  	;
-  	format logP MGT AGT MRT ART MDT comma10.5 pctchng AG percent10.2;
-  	lagvar1 = lag(Payrolls) ;
-  	lagvar12 = lag12(Payrolls);
-  	logP = log(Payrolls); /*Log transformation*/
-  	MGT = log ( Payrolls / lagvar1 ); /*Monthly Growth Transformation ( ln(Xt / Xt-1) )*/ 
-  	AGT = log ( Payrolls / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
-  	MRT = ( Payrolls / lagvar1 ) ;/* Monthly Return Transformation ( Xt / Xt-1 ) */
-  	ART = ( Payrolls / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
-  	MDT = dif(lag(Payrolls)); /* Monthly Difference Transformation ( Xt - Xt-1 ) */	
-  	pctchng = ( ( Payrolls / lag( Payrolls ) ) ** 12 - 1 ) * 100;
-  	AG = dif12( Payrolls ) / lag12( Payrolls ) * 100; /*computed percent change from the same period in the previous year*/
-  run;
-  
-  
-  
-  
-
-proc univariate data = TNFPayrolls normal  ; 
-histogram pctchng / normal;
-run;
-
-proc means data = TNFPayrolls
-  min mean median mode max std range
-  maxdec = 0
-  nmiss;
-  var Payrolls;
-run;
-  
-  
-  
-  
-  
-  %let id02 = %nrstr(1Nolfw8rIW7gFQEbKAR3X-4KaSKUNMZzZ);
-  %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id02;
-  filename url_file url "&_url";
-  
-  data GDP (drop = lagvar1 lagvar4 );
-  	infile url_file missover dsd;
-  	input date :$10. GDP_Var;
-  	label 
-  	logP = "Log Transformation"
-  	QGT = "Quarterly Growth Transformation"
-  	AGT = "Annual Growth Transformation"
-  	QRT = "Quarterly Return Transformation"
-  	ART = "Annual Return Transformation"
-  	QDT = "Quarterly Difference Transformation"
-  	pctchng = "Percetnage Change"
-  	AnnualGrowth = "Annual Growth in Percent"
-  	;
-  	format logP QGT AGT QRT ART QDT comma10.5 pctchng AG percent10.2;
-  	lagvar1 = lag(GDP_Var) ;
-  	lagvar4 = lag4(GDP_Var);
-  	logP = log(GDP_Var); /*Log transformation*/
-  	QGT = log ( GDP_Var / lagvar1 ); /*Quarterly Growth Transformation ( ln(Xt / Xt-1) )*/ 
-  	AGT = log ( GDP_Var / lagvar4 ); /*Annual Growth Transformation ( ln(Xt / Xt-4) ) */
-  	QRT = ( GDP_Var / lagvar1 ) ;/* Quarterly Return Transformation ( Xt / Xt-1 ) */
-  	ART = ( GDP_Var / lagvar1 ) ;/* Annual Return Transformation (Xt / Xt-4 ) */
-  	QDT = dif(lag(GDP_Var)); /* Quarterly Difference Transformation ( Xt - Xt-1 ) */	
-  	pctchng = ( ( GDP_Var / lag( GDP_Var ) ) ** 12 - 1 ) * 100;
-  	AG = dif4( GDP_Var ) / lag4( GDP_Var ) * 100; /*computed percent change from the same period in the previous year*/
-  run;
-  
-
-
-
-
-proc sgplot data = Housing_Starts;
-  	 series x = date y = logvar;
-run;
-
-
- 
- 
-/*  proc expand data = Housing_Starts out = temp1 */
-/*  			 from = month to = qtr; */
-/*  			 id = date; */
-/*  			 convert HousingSt_Var / observed = average; */
-/*  run; */
-
-/* 3 Month - Rolling average for Housing Starts */
-%let roll_num = 3;
-data temp01 ;
-set Housing_Starts;
-array summed[&roll_num] _temporary_;
-if E = &roll_num then E = 1;
-   else E + 1;
-summed[E] = HousingSt_Var;
-if _N_ >= &roll_num then do;
-      roll_avg = mean(of summed[*]);
-   end;
-   format roll_avg comma10.2;
-run;
-
-
-
+*/
 quit;
