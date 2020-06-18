@@ -97,7 +97,7 @@ run;
 
 %put ----------------------------------------------------------------- FIT REGRESSION;
 %macro fit(d_pd);
-%let d_pd = DEL;
+%let d_pd = CUR;
 
 
   %if "&d_pd" = "CUR" %then %do;
@@ -149,10 +149,9 @@ run;
   ods select Coef LSMeans;
   proc logistic data = PD_DATA._prm;
     class next_stat (ref = "&d_pd") &cvar/ param = glm;
-    model next_stat = &var / link = glogit;
+    model next_stat = &var / link = glogit selection = B;
     lsmeans / e ilink cl;
   run;
-  
   
   
   
