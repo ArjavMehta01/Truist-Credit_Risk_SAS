@@ -3,3 +3,5 @@
 *.sas7bdat
 *.csv
 *.ppt
+Report/fit_CUR.html
+*.html
