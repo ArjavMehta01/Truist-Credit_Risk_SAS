@@ -1,6 +1,8 @@
 /* Author: Jonas */
 /* Purpose: Build multinomial logistic regression */
 
+options mstored sasmstore = PD_DATA;
+
 
 %let cvar = fthb_flg Num_unit Prop_typ Purpose Occ_stat;
 
@@ -20,11 +22,10 @@
 %put ----------------------------------------------------------------- DATA PREPARATION;
 * Grouping the FICO;
 
-%macro by_FICO(d_pd);
-%let score = 670;
-%let d_pd = DEL;
+%macro by_FICO(d_pd) / store source;
+
   data PD_DATA._&d_pd;
-    set PD_DATA.&d_pd (keep = act_date next_stat &var);
+    set PD_DATA.train_&d_pd (keep = act_date next_stat &var);
     length FICO $10;
     format yqtr yyq.;
     label hs = "Housing Starts"
@@ -117,15 +118,17 @@ run;
 
 
 %put ----------------------------------------------------------------- FIT REGRESSION;
-%macro fit(d_pd);
+%macro fit(d_pd) / store source;
 
   %if "&d_pd" = "CUR" %then %do;
     %let next = DEL;
     %let n_next = Delinquent;
+    %let report = ModelANOVA;
   %end;
   %if "&d_pd" = "DEL" %then %do;
     %let next = SDQ;
     %let n_next = Default;
+    %let report = ModelBuildingSummary;
   %end;
 
   %let score = 670;
@@ -151,11 +154,11 @@ run;
   footnote j = l "Dataset: &d_pd FICO: Prime";
   footnote2 j = l "Baseline Category: &d_pd";
   
-  ods select ModelANOVA;
+  ods select &report;
   ods output ParameterEstimates = tmp_p;
   proc logistic data = PD_DATA._prm;
     class next_stat (ref = "&d_pd") &cvar / param = glm;
-    model next_stat = &var / link = glogit;
+    model next_stat = &var / link = glogit selection = S;
   run;
     
   
@@ -179,11 +182,11 @@ run;
   footnote j = l "Dataset: &d_pd FICO: Sub-Prime";
   footnote2 j = l "Baseline Category: &d_pd";
   
-  ods select ModelANOVA;
+  ods select &report;
   ods output ParameterEstimates = tmp_s;
   proc logistic data = PD_DATA._sub;
     class next_stat (ref = "&d_pd") &cvar/ param = glm;
-    model next_stat = &var / link = glogit;
+    model next_stat = &var / link = glogit selection = S;
     lsmeans / e ilink cl;
   run;
   
@@ -208,18 +211,15 @@ run;
   footnote; 
   ods html select none;
   ods html close;
+  
+  proc datasets lib = PD_DATA;
+    delete _:;
+  run;
 %mend fit;
 
 
 /* %fit(DEL); */
-%fit(CUR);
-
-
-
-proc datasets lib = PD_DATA;
-  delete _:;
-run;
-
+/* %fit(CUR); */
 
 
 
