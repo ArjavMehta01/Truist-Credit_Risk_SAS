@@ -290,7 +290,7 @@ ods powerpoint exclude all;
   quit;
   ods powerpoint exclude none;
   title "One Way Chi-Square Test of &d_pd Data";
-  footnote j = l "Group: Sub-Prime";
+  footnote j = l "Group: Prime";
   proc freq data = prm_tmp;
     table next_stat / chisq
     testp = (&prm);
