@@ -122,11 +122,14 @@ ods html5 close;
 %macro pdct(d_pd);
 ods powerpoint exclude all;
 
+
   %if "&d_pd" = "CUR" %then %do;
     %let next = DEL;
+    %let n_next = Delinquent;
   %end;
   %if "&d_pd" = "DEL" %then %do;
     %let next = SDQ;
+    %let n_next = Default;
   %end;
 
 * Split training dataset into prime vs. sub-prime;
@@ -174,7 +177,7 @@ ods powerpoint exclude all;
     if 0 < cscore_b < &score then output p_sub_&d_pd;
     if &score <=cscore_b then output p_prm_&d_pd;
     
-    keep &&&d_pd._var fico act_upb next_stat;
+    keep &&&d_pd._var fico act_upb next_stat yqtr;
   run;
   
 * Regression of sub-prime group;
@@ -294,6 +297,45 @@ ods powerpoint exclude all;
   proc freq data = prm_tmp;
     table next_stat / chisq
     testp = (&prm);
+  run;
+  title;
+  footnote;
+  ods powerpoint exclude all;
+  
+  ods output CrossTabFreqs = prm_qtr_f(where = (next_stat = "&next")
+                                        keep = next_stat yqtr colpercent
+                                      rename = (colpercent = historic)
+                                        );
+  proc freq data = prm_tmp;
+    table next_stat*yqtr;
+  run;
+  proc sort data = prm_tmp;
+    by yqtr;
+  run;
+  ods output Summary = prm_qtr_m(keep = yqtr P_next_stat&next._Mean
+                               rename = (P_next_stat&next._Mean = predict));
+  proc means data = prm_tmp mean;
+    var p_:;
+    by yqtr;
+    weight act_upb;
+  run;
+  proc sort data = prm_qtr_f;
+    by yqtr;
+  run;
+  data prm_qtr;
+    merge prm_qtr_:;
+    by yqtr;
+    predict = predict*100;
+  run;
+  
+  ods powerpoint exclude none;
+  title "Prediction of Test-Set";
+  footnote j = l "Data: &d_pd Group: Prime";
+  proc sgplot data = prm_qtr;
+    scatter x = yqtr y = historic / legendlabel = "Historical";
+    series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predict";
+    xaxis label = "Year" grid;
+    yaxis label = "Probability of &n_next (%)" grid;
   run;
   title;
   footnote;
