@@ -265,7 +265,7 @@ run;
 
 %macro Test_FICO(d_pd);
 
-  data PD_DATA.T_&d_pd;
+  data PD_DATA._&d_pd;
     set PD_DATA.test_final_&d_pd(keep = act_upb yqtr next_stat &DEL_var);
     length FICO $10;
     
@@ -275,6 +275,7 @@ run;
   run;
 
 %mend Test_FICO;
+
 
 
 /* Function to Segregate the Test Data to PRIME Dataset and SUBPRIME Dataset */
@@ -439,7 +440,7 @@ run;
   proc logistic data = PD_DATA.train_del_prm;
     class next_stat (ref = "&d_pd") fico / param = glm;
     model next_stat = &&&d_pd._var / link = glogit rsquare cl;
-    weight act_upb / normalize;
+    weight act_upb ;
     lsmeans / e ilink cl;
     code file = "&p_PDDATA./prm_tmp.sas";
   run;
@@ -524,7 +525,7 @@ run;
   title "Prediction of Test-Set";
   footnote j = l "Data: &d_pd Group: Prime";
   proc sgplot data = prm_qtr;
-    series x = yqtr y = historic / legendlabel = "Historical";
+    scatter x = yqtr y = historic / legendlabel = "Historical";
     series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predict";
     xaxis label = "Year" grid;
     yaxis label = "Probability of &n_next (%)" grid;
@@ -591,7 +592,7 @@ run;
 
 %macro Testcur_FICO(d_pd);
 
-  data PD_DATA.T_&d_pd;
+  data PD_DATA.Cur_&d_pd;
     set PD_DATA.test_final_&d_pd(keep = act_upb yqtr next_stat &CUR_var);
     length FICO $10;
     
@@ -622,7 +623,7 @@ run;
 
   %Testcur_FICO(&d_pd);
   data PD_DATA.test_cur_prm PD_DATA.test_cur_sub;
-    set PD_DATA._&d_pd;
+    set PD_DATA.Cur_&d_pd;
    
     if FICO = 'Sub-Prime' then output PD_DATA.test_cur_sub;
     if FICO = 'Prime' then output PD_DATA.test_cur_prm;
@@ -843,6 +844,10 @@ run;
   footnote;
   
  
+ 
+ proc freq data = PD_DATA.test_del_sub;
+ table next_stat*yqtr;
+ run;
 
 
 
