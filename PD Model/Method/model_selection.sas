@@ -1,12 +1,212 @@
 /* Author: Jonas */
 /* Purpose: Contingency table of categorical data */
 
-
+ods graphics on / width = 4in height = 3in;
+options nodate;
 
 %let score = 670;
+%let seg = cscore_b;
+%let n_c1 = Sub-Prime;
+%let n_c2 = Prime;
 
+%let c_var = fico;
 %let CUR_var = oltv orig_amt loan_age ump;
 %let DEL_var = oltv hs;
+
+%macro test(num);
+
+* Multinomial Logistic Regression;
+  proc logistic data = c&num._&d_pd;
+    class next_stat (ref = "&d_pd") &c_var / param = glm;
+    model next_stat = &&&d_pd._var / link = glogit rsquare cl;
+    weight act_upb / normalize;
+    lsmeans / e ilink cl;
+    code file = "%sysfunc(getoption(work))/&num._tmp.sas";
+  run;
+
+* Prediction of each probability;
+  data c&num._tmp;
+    set p_c&num._&d_pd;
+    %include "%sysfunc(getoption(work))/&num._tmp.sas";
+  run;
+  
+* Getting the output data;
+  ods output OneWayFreqs = c&num._f(keep = next_stat percent);
+  proc freq data = c&num._tmp;
+    table next_stat;
+  run;
+  ods output Summary = c&num._m(keep = label_: p_:);
+  proc means data = c&num._tmp mean;
+    var p_:;
+    weight act_upb;
+  run;
+  proc transpose data = c&num._m 
+                  out = c&num._m(keep = _name_ col1 
+                            rename = (_name_ = p_next_stat col1 = predict)
+                              );
+  run;
+  data c&num._m;
+    set c&num._m;
+    _idx = find(p_next_stat, "_mean", "i");
+    next_stat = substr(p_next_stat, _idx-3, 3);
+    predict = round(predict*100, 0.0001);
+    call symputx (trim(next_stat), predict);
+    keep next_stat predict;
+  run;
+  
+* ChiSqr test;
+  %let c&num = &CUR &DEL &PPY &SDQ;
+  %put Estimated Probability: &&&c&num;
+  ods output OneWayChiSq = c&num._chi(keep = label1 cvalue1);
+  proc freq data = c&num._tmp;
+    table next_stat / chisq
+    testp = (&&&c&num);
+  run;
+  data _null_;
+    set c&num._chi;
+    call symputx('K'||left(_n_), label1);
+    call symputx('V'||left(_n_), cvalue1);
+  run;
+
+* Comparation plot;
+  ods output CrossTabFreqs = c&num._plot(where = (next_stat = "&next")
+                                          keep = next_stat yqtr colpercent
+                                        rename = (colpercent = historic)
+                                        );
+  proc freq data = c&num._tmp;
+    table next_stat*yqtr;
+  run;
+  proc sort data = c&num._tmp;
+    by yqtr;
+  run;
+  ods output Summary = c&num._plot2(keep = yqtr P_next_stat&next._Mean
+                                  rename = (P_next_stat&next._Mean = predict));
+  proc means data = c&num._tmp mean;
+    var p_:;
+    by yqtr;
+    weight act_upb;
+  run;
+  proc sort data = c&num._plot;
+    by yqtr;
+  run;
+  data c&num._plot;
+    merge c&num._plot:;
+    by yqtr;
+    predict = predict*100;
+  run;
+  
+* Prepare for output;
+  proc sql;
+    create table work.c&num._r as
+    select f.next_stat "Next State",
+           percent "Actual (%)",
+           predict "Predicted (%)"
+      from work.c&num._m as m inner join work.c&num._f as f
+        on m.next_stat = f.next_stat
+      order by f.next_stat
+      ;
+  quit;
+  proc transpose data = c&num._r out = c&num._r(drop = _name_);
+    id next_stat;
+  run;
+
+* Output the results;
+  ods powerpoint exclude none;
+  title "Overall Prediction";
+  proc print data = c&num._r noobs;
+    format _numeric_ 8.2;
+  run;  
+  title;
+  title j = l "Group: &&&n_c&num";
+  proc sgplot data = c&num._plot;
+    scatter x = yqtr y = historic / legendlabel = "Actual";
+    series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predicted";
+    inset ("&K1" = "&V1"
+           "&K3" = "&V3") / border opaque;
+    xaxis label = "Year" grid;
+    yaxis label = "Probability of &n_next (%)" grid;
+  run;
+  title;
+  ods powerpoint exclude all;  
+  
+%mend test;
+
+
+%macro predict(d_pd);
+ods powerpoint exclude all;
+
+  %if "&d_pd" = "CUR" %then %do;
+    %let next = DEL;
+    %let n_next = Delinquent;
+  %end;
+  %if "&d_pd" = "DEL" %then %do;
+    %let next = SDQ;
+    %let n_next = Default;
+  %end;
+
+* Split training dataset into two classes;
+  data c1_&d_pd c2_&d_pd;
+    set PD_DATA.train_&d_pd;
+    
+    attrib fico label = "FICO"             length = $10.
+           hs   label = "Housing Starts"
+           ump  label = "Unemployment Rate"
+    ;
+    if cscore_b le 349 then fico = "[0-350)";
+      else if cscore_b le 619 then fico = "[350,619]";
+      else if cscore_b le 639 then fico = "[620,639]";
+      else if cscore_b le 659 then fico = "[640,659]";
+      else if cscore_b le 679 then fico = "[660,679]";
+      else if cscore_b le 699 then fico = "[680,699]";
+      else if cscore_b le 719 then fico = "[700,719]";
+      else if cscore_b le 739 then fico = "[720,739]";
+      else if cscore_b ge 740 then fico = "[740+)";
+    
+    if 0 < &seg < &score then output c1_&d_pd;
+    if &score <= &seg then output c2_&d_pd;
+    
+    keep &&&d_pd._var &c_var act_upb next_stat yqtr;
+  run;
+  
+* Split testing dataset into two classes;
+  data p_c1_&d_pd p_c2_&d_pd;
+    set PD_DATA.test_&d_pd;
+    
+    attrib fico label = "FICO"             length = $10.
+           hs   label = "Housing Starts"
+           ump  label = "Unemployment Rate"
+    ;
+    if cscore_b le 349 then fico = "[0-350)";
+      else if cscore_b le 619 then fico = "[350,619]";
+      else if cscore_b le 639 then fico = "[620,639]";
+      else if cscore_b le 659 then fico = "[640,659]";
+      else if cscore_b le 679 then fico = "[660,679]";
+      else if cscore_b le 699 then fico = "[680,699]";
+      else if cscore_b le 719 then fico = "[700,719]";
+      else if cscore_b le 739 then fico = "[720,739]";
+      else if cscore_b ge 740 then fico = "[740+)";
+    
+    if 0 < &seg < &score then output p_c1_&d_pd;
+    if &score <= &seg then output p_c2_&d_pd;
+    
+    keep &&&d_pd._var &c_var act_upb next_stat yqtr;
+  run;
+  
+  %test(1);
+  %test(2);
+
+%mend predict;
+
+options nodate;
+ods powerpoint file = "&p_report/model1.ppt"
+              style = Sapphire;
+%predict(DEL);
+%predict(CUR);
+
+ods powerpoint close;
+
+
+
 
 /*
 
@@ -117,260 +317,3 @@ ods html5 close;
 */
 
 /* ods html5 file = "&p_report/ "; */
-
-
-%macro pdct(d_pd);
-ods powerpoint exclude all;
-
-
-  %if "&d_pd" = "CUR" %then %do;
-    %let next = DEL;
-    %let n_next = Delinquent;
-  %end;
-  %if "&d_pd" = "DEL" %then %do;
-    %let next = SDQ;
-    %let n_next = Default;
-  %end;
-
-* Split training dataset into prime vs. sub-prime;
-  data sub_&d_pd prm_&d_pd;
-    set PD_DATA.train_&d_pd;
-    
-    attrib fico label = "FICO"             length = $10.
-           hs   label = "Housing Starts"
-           ump  label = "Unemployment Rate"
-    ;
-    if cscore_b le 349 then fico = "[0-350)";
-      else if cscore_b le 619 then fico = "[350,619]";
-      else if cscore_b le 639 then fico = "[620,639]";
-      else if cscore_b le 659 then fico = "[640,659]";
-      else if cscore_b le 679 then fico = "[660,679]";
-      else if cscore_b le 699 then fico = "[680,699]";
-      else if cscore_b le 719 then fico = "[700,719]";
-      else if cscore_b le 739 then fico = "[720,739]";
-      else if cscore_b ge 740 then fico = "[740+)";
-    
-    if 0 < cscore_b < &score then output sub_&d_pd;
-    if &score <=cscore_b then output prm_&d_pd;
-    
-    keep &&&d_pd._var fico act_upb next_stat;
-  run;
-  
-* Split testing dataset into prime vs. sub-prime;
-  data p_sub_&d_pd p_prm_&d_pd;
-    set PD_DATA.test_&d_pd;
-    
-    attrib fico label = "FICO"             length = $10.
-           hs   label = "Housing Starts"
-           ump  label = "Unemployment Rate"
-    ;
-    if cscore_b le 349 then fico = "[0-350)";
-      else if cscore_b le 619 then fico = "[350,619]";
-      else if cscore_b le 639 then fico = "[620,639]";
-      else if cscore_b le 659 then fico = "[640,659]";
-      else if cscore_b le 679 then fico = "[660,679]";
-      else if cscore_b le 699 then fico = "[680,699]";
-      else if cscore_b le 719 then fico = "[700,719]";
-      else if cscore_b le 739 then fico = "[720,739]";
-      else if cscore_b ge 740 then fico = "[740+)";
-    
-    if 0 < cscore_b < &score then output p_sub_&d_pd;
-    if &score <=cscore_b then output p_prm_&d_pd;
-    
-    keep &&&d_pd._var fico act_upb next_stat yqtr;
-  run;
-  
-* Regression of sub-prime group;
-  proc logistic data = sub_&d_pd;
-    class next_stat (ref = "&d_pd") fico / param = glm;
-    model next_stat = &&&d_pd._var / link = glogit rsquare cl;
-    weight act_upb / normalize;
-    lsmeans / e ilink cl;
-    code file = "%sysfunc(getoption(work))/sub_tmp.sas";
-  run;
-
-* Test of prediction;
-  data sub_tmp;
-    set p_sub_&d_pd;
-    %include "%sysfunc(getoption(work))/sub_tmp.sas";
-  run;
-  
-* Getting the output data;
-  ods output OneWayFreqs = sub_tmp_f(keep = next_stat percent);
-  proc freq data = sub_tmp;
-    table next_stat;
-  run;
-  ods output Summary = sub_tmp_m(keep = label_: p_:);
-  proc means data = sub_tmp mean;
-    var p_:;
-    weight act_upb;
-  run;
-  proc transpose data = sub_tmp_m 
-                  out = sub_tmp_m(keep = _name_ col1 
-                            rename = (_name_ = p_next_stat col1 = predict)
-                              );
-  run;
-  data sub_tmp_m;
-    set sub_tmp_m;
-    _idx = find(p_next_stat, "_mean", "i");
-    next_stat = substr(p_next_stat, _idx-3, 3);
-    predict = round(predict*100, 0.0001);
-    call symputx (trim(next_stat), predict);
-    keep next_stat predict;
-  run;
-  %let sub = &CUR &DEL &PPY &SDQ;
-  %put &sub;
-  proc sql;
-    create table work.sub_tmp_r as
-    select f.next_stat "Next State",
-           percent "Actual Probability (%)",
-           predict "Predicted Probability (%)"
-      from work.sub_tmp_m as m inner join work.sub_tmp_f as f
-        on m.next_stat = f.next_stat
-      order by f.next_stat
-      ;
-  quit;
-  ods powerpoint exclude none;
-  title "One Way Chi-Square Test of &d_pd Data";
-  footnote j = l "Group: Sub-Prime";
-  proc freq data = sub_tmp;
-    table next_stat / chisq
-    testp = (&sub);
-  run;
-  title;
-  footnote;
-  ods powerpoint exclude all;
-  
-* Regression of prime group;
-  proc logistic data = prm_&d_pd;
-    class next_stat (ref = "&d_pd") fico / param = glm;
-    model next_stat = &&&d_pd._var / link = glogit rsquare cl;
-    weight act_upb / normalize;
-    lsmeans / e ilink cl;
-    code file = "%sysfunc(getoption(work))/prm_tmp.sas";
-  run;
-
-* Test of prediction;
-  data prm_tmp;
-    set p_prm_&d_pd;
-    %include "%sysfunc(getoption(work))/prm_tmp.sas";
-  run;
-  
-* Getting the output data;
-  ods output OneWayFreqs = prm_tmp_f(keep = next_stat percent);
-  proc freq data = prm_tmp;
-    tables next_stat;
-  run;
-  ods output Summary = prm_tmp_m(keep = label_: p_:);
-  proc means data = prm_tmp mean;
-    var p_:;
-    weight act_upb;
-  run;
-  proc transpose data = prm_tmp_m 
-                  out = prm_tmp_m(keep = _name_ col1 
-                            rename = (_name_ = p_next_stat col1 = predict)
-                              );
-  run;
-  data prm_tmp_m;
-    set prm_tmp_m;
-    _idx = find(p_next_stat, "_mean", "i");
-    next_stat = substr(p_next_stat, _idx-3, 3);
-    predict = round(predict*100, 0.0001);
-    call symputx (trim(next_stat), predict);
-    keep next_stat predict;
-  run;
-  %let prm = &CUR &DEL &PPY &SDQ;
-  %put &prm;
-  proc sql;
-    create table work.prm_tmp_r as
-    select f.next_stat "Next State",
-           percent "Actual Probability (%)",
-           predict "Predicted Probability (%)"
-      from work.prm_tmp_m as m inner join work.prm_tmp_f as f
-        on m.next_stat = f.next_stat
-      order by f.next_stat
-      ;
-  quit;
-  ods powerpoint exclude none;
-  title "One Way Chi-Square Test of &d_pd Data";
-  footnote j = l "Group: Prime";
-  proc freq data = prm_tmp;
-    table next_stat / chisq
-    testp = (&prm);
-  run;
-  title;
-  footnote;
-  ods powerpoint exclude all;
-  
-  ods output CrossTabFreqs = prm_qtr_f(where = (next_stat = "&next")
-                                        keep = next_stat yqtr colpercent
-                                      rename = (colpercent = historic)
-                                        );
-  proc freq data = prm_tmp;
-    table next_stat*yqtr;
-  run;
-  proc sort data = prm_tmp;
-    by yqtr;
-  run;
-  ods output Summary = prm_qtr_m(keep = yqtr P_next_stat&next._Mean
-                               rename = (P_next_stat&next._Mean = predict));
-  proc means data = prm_tmp mean;
-    var p_:;
-    by yqtr;
-    weight act_upb;
-  run;
-  proc sort data = prm_qtr_f;
-    by yqtr;
-  run;
-  data prm_qtr;
-    merge prm_qtr_:;
-    by yqtr;
-    predict = predict*100;
-  run;
-  
-  ods powerpoint exclude none;
-  title "Prediction of Test-Set";
-  footnote j = l "Data: &d_pd Group: Prime";
-  proc sgplot data = prm_qtr;
-    scatter x = yqtr y = historic / legendlabel = "Historical";
-    series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predict";
-    xaxis label = "Year" grid;
-    yaxis label = "Probability of &n_next (%)" grid;
-  run;
-  title;
-  footnote;
-  ods powerpoint exclude all;
-
-* Final report;
-  data tmp_r;
-    set sub_tmp_r(in = s) prm_tmp_r(in = p);
-    format predict 8.2;
-    if s then FICO = "Sub-Prime";
-    if p then FICO = "Prime";
-  run;
-  
-  ods powerpoint exclude none;
-  title "Prediction of Test-Set";
-  footnote j = l "Data: &d_pd";
-  proc report data = tmp_r;
-    columns FICO next_stat percent predict;
-    define FICO / group center;
-    define next_stat / display center;
-    define percent / analysis center;
-    define predict / analysis center;
-    compute next_stat;
-      if next_stat = "&next" then call define(_row_, "style", "style={background=cxdeebf7}");
-    endcomp;
-  run;
-  title;
-  footnote;
-  ods powerpoint exclude all;
-%mend pdct;
-
-options nodate;
-ods powerpoint file = "&p_report/test.ppt"
-              style = Sapphire;
-%pdct(DEL);
-%pdct(CUR);
-
-ods powerpoint close;
