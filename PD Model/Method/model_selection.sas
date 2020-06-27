@@ -4,31 +4,72 @@
 ods graphics on / width = 4in height = 3in;
 options nodate;
 
+
 %let score = 670;
 %let seg = cscore_b;
 %let n_c1 = Sub-Prime;
 %let n_c2 = Prime;
 
 %let c_var = fico;
-%let CUR_var = oltv orig_amt loan_age ump;
-%let DEL_var = oltv hs;
+%let v_var = cscore_b;
+proc format;
+  value c_&c_var low -< 350 = '[0-350)'
+               350 -< 620 = '[350,619]'
+               620 -< 640 = '[620,639]'
+               640 -< 660 = '[640,659]'
+               660 -< 680 = '[660,679]'
+               680 -< 700 = '[680,699]'
+               700 -< 720 = '[700,719]'
+               720 -< 740 = '[720,739]'
+               740 - high = '[740+)'
+  ;
+run;
+
+%let CUR_macro = ump;
+%let DEL_macro = hs;
+
+
+%let CUR_var = oltv orig_amt loan_age &CUR_macro;
+%let DEL_var = oltv &DEL_macro;
 
 %macro test(num);
 
 * Multinomial Logistic Regression;
   proc logistic data = c&num._&d_pd;
     class next_stat (ref = "&d_pd") &c_var / param = glm;
-    model next_stat = &&&d_pd._var / link = glogit rsquare cl;
+    model next_stat = &&&d_pd._var &c_var/ link = glogit rsquare cl;
     weight act_upb / normalize;
     lsmeans / e ilink cl;
     code file = "%sysfunc(getoption(work))/&num._tmp.sas";
   run;
 
-* Prediction of each probability;
+* Prediction for validation;
   data c&num._tmp;
     set p_c&num._&d_pd;
     %include "%sysfunc(getoption(work))/&num._tmp.sas";
   run;
+
+* Prediction for test;
+  proc means data = c&num._&d_pd(drop = yqtr next_stat) mean;
+    weight act_upb;
+    output out = p_tmp_m(keep = &&&d_pd._var &seg _stat_ where = (_stat_ = "MEAN"));
+  run;
+  data _null_;
+    set PD_DATA.out_&d_pd(obs = 1);
+    if _n_ = 1 then call symputx ('p_macro', &&&d_pd._macro);
+  run;
+  data p_tmp;
+    set p_tmp_m;
+    &c_var = put(&v_var, c_&c_var..);
+    &&&d_pd._macro = &p_macro;
+    keep &&&d_pd._var &c_var;
+  run;
+  data p_c&num._&d_pd;
+    set p_tmp;
+    %include "%sysfunc(getoption(work))/&num._tmp.sas";
+    drop I_: U_:;
+  run;
+  
   
 * Getting the output data;
   ods output OneWayFreqs = c&num._f(keep = next_stat percent);
@@ -145,27 +186,19 @@ ods powerpoint exclude all;
   %end;
 
 * Split training dataset into two classes;
-  data c1_&d_pd c2_&d_pd;
+  data c1_&d_pd c2_&d_pd p_&d_pd;
     set PD_DATA.train_&d_pd;
     
     attrib fico label = "FICO"             length = $10.
            hs   label = "Housing Starts"
            ump  label = "Unemployment Rate"
     ;
-    if cscore_b le 349 then fico = "[0-350)";
-      else if cscore_b le 619 then fico = "[350,619]";
-      else if cscore_b le 639 then fico = "[620,639]";
-      else if cscore_b le 659 then fico = "[640,659]";
-      else if cscore_b le 679 then fico = "[660,679]";
-      else if cscore_b le 699 then fico = "[680,699]";
-      else if cscore_b le 719 then fico = "[700,719]";
-      else if cscore_b le 739 then fico = "[720,739]";
-      else if cscore_b ge 740 then fico = "[740+)";
-    
+    &c_var = put(&v_var, c_&c_var..);
     if 0 < &seg < &score then output c1_&d_pd;
     if &score <= &seg then output c2_&d_pd;
+    output p_&d_pd;
     
-    keep &&&d_pd._var &c_var act_upb next_stat yqtr;
+    keep &&&d_pd._var &c_var act_upb next_stat yqtr &seg;
   run;
   
 * Split testing dataset into two classes;
@@ -176,16 +209,7 @@ ods powerpoint exclude all;
            hs   label = "Housing Starts"
            ump  label = "Unemployment Rate"
     ;
-    if cscore_b le 349 then fico = "[0-350)";
-      else if cscore_b le 619 then fico = "[350,619]";
-      else if cscore_b le 639 then fico = "[620,639]";
-      else if cscore_b le 659 then fico = "[640,659]";
-      else if cscore_b le 679 then fico = "[660,679]";
-      else if cscore_b le 699 then fico = "[680,699]";
-      else if cscore_b le 719 then fico = "[700,719]";
-      else if cscore_b le 739 then fico = "[720,739]";
-      else if cscore_b ge 740 then fico = "[740+)";
-    
+    &c_var = put(&v_var, c_&c_var..);
     if 0 < &seg < &score then output p_c1_&d_pd;
     if &score <= &seg then output p_c2_&d_pd;
     
@@ -194,7 +218,13 @@ ods powerpoint exclude all;
   
   %test(1);
   %test(2);
-
+  
+  data PD_DATA.p_&d_pd;
+    length group $20;
+    set p_c1_&d_pd(in = c1) p_c2_&d_pd(in = c2);
+    if c1 then group = "&n_c1";
+    if c2 then group = "&n_c2";
+  run;
 %mend predict;
 
 options nodate;
@@ -205,8 +235,10 @@ ods powerpoint file = "&p_report/model1.ppt"
 
 ods powerpoint close;
 
-
-
+proc export data = PD_DATA.p_cur outfile = "&p_pddata/cur.csv" dbms = csv;
+run;
+proc export data = PD_DATA.p_del outfile = "&p_pddata/del.csv" dbms = csv;
+run;
 
 /*
 
