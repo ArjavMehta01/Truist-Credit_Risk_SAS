@@ -50,25 +50,25 @@ run;
   run;
 
 * Prediction for test;
-  proc means data = c&num._&d_pd(drop = yqtr next_stat) mean;
-    weight act_upb;
-    output out = p_tmp_m(keep = &&&d_pd._var &seg _stat_ where = (_stat_ = "MEAN"));
-  run;
-  data _null_;
-    set PD_DATA.out_&d_pd(obs = 1);
-    if _n_ = 1 then call symputx ('p_macro', &&&d_pd._macro);
-  run;
-  data p_tmp;
-    set p_tmp_m;
-    &c_var = put(&v_var, c_&c_var..);
-    &&&d_pd._macro = &p_macro;
-    keep &&&d_pd._var &c_var;
-  run;
-  data p_c&num._&d_pd;
-    set p_tmp;
-    %include "%sysfunc(getoption(work))/&num._tmp.sas";
-    drop I_: U_:;
-  run;
+/*   proc means data = c&num._&d_pd(drop = yqtr next_stat) mean; */
+/*     weight act_upb; */
+/*     output out = p_tmp_m(keep = &&&d_pd._var &seg _stat_ where = (_stat_ = "MEAN")); */
+/*   run; */
+/*   data _null_; */
+/*     set PD_DATA.out_&d_pd(obs = 1); */
+/*     if _n_ = 1 then call symputx ('p_macro', &&&d_pd._macro); */
+/*   run; */
+/*   data p_tmp; */
+/*     set p_tmp_m; */
+/*     &c_var = put(&v_var, c_&c_var..); */
+/*     &&&d_pd._macro = &p_macro; */
+/*     keep &&&d_pd._var &c_var; */
+/*   run; */
+/*   data p_c&num._&d_pd; */
+/*     set p_tmp; */
+/*     %include "%sysfunc(getoption(work))/&num._tmp.sas"; */
+/*     drop I_: U_:; */
+/*   run; */
   
   
 * Getting the output data;
@@ -203,7 +203,7 @@ ods powerpoint exclude all;
   
 * Split testing dataset into two classes;
   data p_c1_&d_pd p_c2_&d_pd;
-    set PD_DATA.test_&d_pd;
+    set PD_DATA.out_&d_pd;
     
     attrib fico label = "FICO"             length = $10.
            hs   label = "Housing Starts"
@@ -219,26 +219,26 @@ ods powerpoint exclude all;
   %test(1);
   %test(2);
   
-  data PD_DATA.p_&d_pd;
-    length group $20;
-    set p_c1_&d_pd(in = c1) p_c2_&d_pd(in = c2);
-    if c1 then group = "&n_c1";
-    if c2 then group = "&n_c2";
-  run;
+/*   data PD_DATA.p_&d_pd; */
+/*     length group $20; */
+/*     set p_c1_&d_pd(in = c1) p_c2_&d_pd(in = c2); */
+/*     if c1 then group = "&n_c1"; */
+/*     if c2 then group = "&n_c2"; */
+/*   run; */
 %mend predict;
 
 options nodate;
 ods powerpoint file = "&p_report/model1.ppt"
               style = Sapphire;
 %predict(DEL);
-%predict(CUR);
+/* %predict(CUR); */
 
 ods powerpoint close;
 
-proc export data = PD_DATA.p_cur outfile = "&p_pddata/cur.csv" dbms = csv;
-run;
-proc export data = PD_DATA.p_del outfile = "&p_pddata/del.csv" dbms = csv;
-run;
+/* proc export data = PD_DATA.p_cur outfile = "&p_pddata/cur.csv" dbms = csv; */
+/* run; */
+/* proc export data = PD_DATA.p_del outfile = "&p_pddata/del.csv" dbms = csv; */
+/* run; */
 
 /*
 
