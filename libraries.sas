@@ -2,7 +2,7 @@
 /* Purpose: library file for local path */
 
   
-%let p_local = /folders/myfolders/GitHub/Truist-Credit_Risk_SAS;
+%let p_local = /folders/myfolders/Truist-Credit_Risk_SAS;
 
   
 %let p_anly = %sysfunc(cat(&p_local,/Data Analysis/));
