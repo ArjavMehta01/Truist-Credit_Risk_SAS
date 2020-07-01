@@ -33,23 +33,44 @@ run;
 %let DEL_var = oltv &DEL_macro;
 
 %macro test(num);
-
+  ods powerpoint exclude all;
 * Multinomial Logistic Regression;
+  ods output ParameterEstimates = &d_pd._c&num._pa(keep = variable response classval0 estimate probchisq);
   proc logistic data = c&num._&d_pd;
     class next_stat (ref = "&d_pd") &c_var / param = glm;
     model next_stat = &&&d_pd._var &c_var/ link = glogit rsquare cl;
     weight act_upb / normalize;
-    lsmeans / e ilink cl;
+/*     lsmeans / e ilink cl; */
     code file = "%sysfunc(getoption(work))/&num._tmp.sas";
   run;
-
-* Prediction for validation;
+  
+  ods rtf exclude none;
+  title "Parameter Estimates";
+  title2 j = l "Data: &d_pd. Group: &&&n_c&num";
+  proc report data = &d_pd._c&num._pa;
+    columns variable response classval0 estimate probchisq;
+    define variable / "Variable" display;
+    define response / "Response" display;
+    define estimate / display;
+    define probchisq / display;
+    compute probchisq;
+      if response = "&next" then do;
+        call define(_row_, "style", "style={background=cxdeebf7}");
+          if probchisq > 0.05 then
+            call define(_row_, "style", "style={background=cxdeebf7 foreground=cxde2d26}");
+      end;
+    endcomp;
+  run;
+  title;
+  ods rtf exclude all;
+  
+* Prediction for the test;
   data c&num._tmp;
     set p_c&num._&d_pd;
     %include "%sysfunc(getoption(work))/&num._tmp.sas";
   run;
 
-* Prediction for test;
+/* * Prediction for forcast; */
 /*   proc means data = c&num._&d_pd(drop = yqtr next_stat) mean; */
 /*     weight act_upb; */
 /*     output out = p_tmp_m(keep = &&&d_pd._var &seg _stat_ where = (_stat_ = "MEAN")); */
@@ -69,7 +90,6 @@ run;
 /*     %include "%sysfunc(getoption(work))/&num._tmp.sas"; */
 /*     drop I_: U_:; */
 /*   run; */
-  
   
 * Getting the output data;
   ods output OneWayFreqs = c&num._f(keep = next_stat percent);
@@ -96,7 +116,12 @@ run;
   run;
   
 * ChiSqr test;
+%if "&d_pd" = "DEL" %then %do;
   %let c&num = &CUR &DEL &PPY &SDQ;
+%end;
+%if "&d_pd" = "CUR" %then %do;
+  %let c&num = &CUR &DEL &PPY;
+%end;
   %put Estimated Probability: &&&c&num;
   ods output OneWayChiSq = c&num._chi(keep = label1 cvalue1);
   proc freq data = c&num._tmp;
@@ -120,8 +145,7 @@ run;
   proc sort data = c&num._tmp;
     by yqtr;
   run;
-  ods output Summary = c&num._plot2(keep = yqtr P_next_stat&next._Mean
-                                  rename = (P_next_stat&next._Mean = predict));
+  ods output Summary = &d_pd._c&num._plot2(keep = yqtr P_next_stat:);
   proc means data = c&num._tmp mean;
     var p_:;
     by yqtr;
@@ -172,7 +196,6 @@ run;
   
 %mend test;
 
-
 %macro predict(d_pd);
 ods powerpoint exclude all;
 
@@ -204,7 +227,7 @@ ods powerpoint exclude all;
 * Split testing dataset into two classes;
   data p_c1_&d_pd p_c2_&d_pd;
     set PD_DATA.out_&d_pd;
-    
+    where orig_dte < "30Mar2016"d;
     attrib fico label = "FICO"             length = $10.
            hs   label = "Housing Starts"
            ump  label = "Unemployment Rate"
@@ -214,10 +237,12 @@ ods powerpoint exclude all;
     if &score <= &seg then output p_c2_&d_pd;
     
     keep &&&d_pd._var &c_var act_upb next_stat yqtr;
+    
   run;
   
   %test(1);
   %test(2);
+  
   
 /*   data PD_DATA.p_&d_pd; */
 /*     length group $20; */
@@ -229,16 +254,36 @@ ods powerpoint exclude all;
 
 options nodate;
 ods powerpoint file = "&p_report/model1.ppt"
-              style = Sapphire;
+               style = Sapphire;
+ods rtf file = "&p_report/model1.rtf"
+        style = Sapphire;
+ods rtf exclude all;
 %predict(DEL);
-/* %predict(CUR); */
+%predict(CUR);
 
+ods rtf close;
 ods powerpoint close;
 
-/* proc export data = PD_DATA.p_cur outfile = "&p_pddata/cur.csv" dbms = csv; */
-/* run; */
-/* proc export data = PD_DATA.p_del outfile = "&p_pddata/del.csv" dbms = csv; */
-/* run; */
+data PD_DATA.out_sub;
+  merge del_c1_plot2(rename = (P_Next_statCUR_Mean = DEL_to_CUR P_Next_statDEL_Mean = DEL_to_DEL 
+                             P_Next_statPPY_Mean = DEL_to_PPY P_Next_statSDQ_Mean = DEL_to_SDQ)) 
+      cur_c1_plot2(rename = (P_Next_statCUR_Mean = CUR_to_CUR P_Next_statDEL_Mean = CUR_to_DEL 
+                             P_Next_statPPY_Mean = CUR_to_PPY P_Next_statSDQ_Mean = CUR_to_SDQ));
+  by yqtr;
+run;
+
+data PD_DATA.out_prm;
+  merge del_c2_plot2(rename = (P_Next_statCUR_Mean = DEL_to_CUR P_Next_statDEL_Mean = DEL_to_DEL 
+                             P_Next_statPPY_Mean = DEL_to_PPY P_Next_statSDQ_Mean = DEL_to_SDQ)) 
+      cur_c2_plot2(rename = (P_Next_statCUR_Mean = CUR_to_CUR P_Next_statDEL_Mean = CUR_to_DEL 
+                             P_Next_statPPY_Mean = CUR_to_PPY P_Next_statSDQ_Mean = CUR_to_SDQ));
+  by yqtr;
+run;
+
+proc export data = PD_DATA.out_sub outfile = "&p_pddata/sub.csv" dbms = csv;
+run;
+proc export data = PD_DATA.out_prm outfile = "&p_pddata/prime.csv" dbms = csv;
+run;
 
 /*
 
@@ -316,7 +361,7 @@ ods powerpoint close;
   run;
   
   
-  ods html5 select all;
+  ods rtf5 select all;
   title "Contingency table of &var";
   footnote j = l "Current State: CUR";
   footnote2 j = l "Next State: DEL";
@@ -333,19 +378,19 @@ ods powerpoint close;
   run;
   title;
   
-  ods html5 select none;
+  ods rtf5 select none;
 %mend s_plot;
 
 options nodate;
-ods html5 file = "&p_report/sasoutput.html" style = Sapphire;
-ods html5 select none;
+ods rtf5 file = "&p_report/sasoutput.rtf" style = Sapphire;
+ods rtf5 select none;
 %s_plot(AMT);
 %s_plot(DTI);
 %s_plot(OLTV);
 %s_plot(FICO);
-ods html5 close;
+ods rtf5 close;
 
 
 */
 
-/* ods html5 file = "&p_report/ "; */
+/* ods rtf5 file = "&p_report/ "; */
