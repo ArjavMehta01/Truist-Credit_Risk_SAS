@@ -4,6 +4,12 @@
 
 %macro transition_matrix(input, output, date = yqtr, response = SDQ, plot = TRUE);
 
+
+%let input = PD_DATA.prime;
+%let date = yqtr;
+%let response = SDQ;
+
+
   proc sort data = &input nodupkey out = tmp;
     by &date;
   run;
@@ -34,15 +40,27 @@
     drop _:;
   run;
 
-  data tmp;
+  data tmp_2;
     merge tmp(in = a) &input.(in = b);
     by &date curr_stat;
     if a;
   run;
 
-  
+  proc iml;
+/* Transition matrix. Columns are next state; rows are current state */
+/*     Null  H   HT  HTH */
 
+use tmp_2;
+read all;
 
+       
+N =  %sysfunc(tranwrd(%quote(&var), %str( ), %str(||) ));
+
+print N[L="Transition Matrix"];
+quit;
+
+%let varlist = %sysfunc(tranwrd(%quote(&var), %str( ), %str(||)));
+%put &varlist;
 
 %mend transition_matrix;
 

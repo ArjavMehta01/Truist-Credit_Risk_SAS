@@ -1,5 +1,5 @@
 /* Author: Jonas */
-/* Purpose: Contingency table of categorical data */
+/* Purpose: Model 1: Static predictors */
 
 ods graphics on / width = 4in height = 3in;
 options nodate;
@@ -288,7 +288,7 @@ ods powerpoint exclude all;
 /*     if c2 then group = "&n_c2"; */
 /*   run; */
 %mend predict;
-/*
+
 options nodate;
 ods powerpoint file = "&p_report/model1.ppt"
                style = Sapphire;
@@ -297,11 +297,11 @@ ods html file = "&p_report/model1.html"
 ods html exclude all;
 
 %predict(DEL);
-%predict(CUR);
+/* %predict(CUR); */
 
 ods html close;
 ods powerpoint close;
-*/
+
 
 %macro out_matrix(num);
 
