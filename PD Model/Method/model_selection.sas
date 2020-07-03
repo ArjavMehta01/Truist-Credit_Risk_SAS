@@ -7,10 +7,10 @@ options nodate;
 
 %let score = 670;
 %let seg = cscore_b;
-%let n_c1 = Sub-Prime;
+%let n_c1 = Sub_Prime;
 %let n_c2 = Prime;
 
-%let c_var = fico;
+%let c_var = FICO;
 %let v_var = cscore_b;
 proc format;
   value c_&c_var low -< 350 = '[0-350)'
@@ -29,8 +29,8 @@ run;
 %let DEL_macro = hs;
 
 
-%let CUR_var = oltv orig_amt loan_age &CUR_macro;
-%let DEL_var = oltv &DEL_macro;
+%let CUR_var = OLTV orig_amt loan_age &CUR_macro;
+%let DEL_var = OLTV &DEL_macro;
 
 %macro test(num);
   ods powerpoint exclude all;
@@ -40,11 +40,11 @@ run;
     class next_stat (ref = "&d_pd") &c_var / param = glm;
     model next_stat = &&&d_pd._var &c_var/ link = glogit rsquare cl;
     weight act_upb / normalize;
-/*     lsmeans / e ilink cl; */
+    lsmeans / e ilink cl;
     code file = "%sysfunc(getoption(work))/&num._tmp.sas";
   run;
   
-  ods rtf exclude none;
+  ods html exclude none;
   title "Parameter Estimates";
   title2 j = l "Data: &d_pd. Group: &&&n_c&num";
   proc report data = &d_pd._c&num._pa;
@@ -62,7 +62,42 @@ run;
     endcomp;
   run;
   title;
-  ods rtf exclude all;
+  ods html exclude all;
+  
+  ods html exclude none;
+  title "Parameter Estimates (Next: &next)";
+  footnote j = l "Data: &d_pd. Group: &&&n_c&num";
+  proc report data = &d_pd._c&num._pa (where = (response = "&next"));
+    columns variable response classval0 estimate probchisq;
+    define variable / "Variable" display;
+    define response / "Response" display;
+    define classval0 / "Class" display;
+    define estimate / display;
+    define probchisq / display;
+    compute probchisq;
+      if probchisq > 0.05 then
+        call define(_row_, "style", "style={foreground=cxde2d26}");
+    endcomp;
+  run;
+  title;
+  footnote;
+  title "Parameter Estimates (Next: PPY)";
+  footnote j = l "Data: &d_pd. Group: &&&n_c&num";
+  proc report data = &d_pd._c&num._pa (where = (response = "PPY"));
+    columns variable response classval0 estimate probchisq;
+    define variable / "Variable" display;
+    define response / "Response" display;
+    define classval0 / "Class" display;
+    define estimate / display;
+    define probchisq / display;
+    compute probchisq;
+      if probchisq > 0.05 then
+        call define(_row_, "style", "style={foreground=cxde2d26}");
+    endcomp;
+  run;
+  title;
+  footnote;
+  ods html exclude all;
   
 * Prediction for the test;
   data c&num._tmp;
@@ -182,19 +217,21 @@ run;
     format _numeric_ 8.2;
   run;  
   title;
-  title j = l "Group: &&&n_c&num";
-  proc sgplot data = c&num._plot;
-    scatter x = yqtr y = historic / legendlabel = "Actual";
-    series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predicted";
-    inset ("&K1" = "&V1"
-           "&K3" = "&V3") / border opaque;
-    xaxis label = "Year" grid;
-    yaxis label = "Probability of &n_next (%)" grid;
-  run;
-  title;
+/*   title j = l "Group: &&&n_c&num"; */
+/*   proc sgplot data = c&num._plot; */
+/*     scatter x = yqtr y = historic / legendlabel = "Actual"; */
+/*     series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predicted"; */
+/*     inset ("&K1" = "&V1" */
+/*            "&K3" = "&V3") / border opaque; */
+/*     xaxis label = "Year" grid; */
+/*     yaxis label = "Probability of &n_next (%)" grid; */
+/*   run; */
+/*   title; */
   ods powerpoint exclude all;  
   
 %mend test;
+%let d_pd = DEL;
+%let num = 1;
 
 %macro predict(d_pd);
 ods powerpoint exclude all;
@@ -212,7 +249,7 @@ ods powerpoint exclude all;
   data c1_&d_pd c2_&d_pd p_&d_pd;
     set PD_DATA.train_&d_pd;
     
-    attrib fico label = "FICO"             length = $10.
+    attrib FICO label = "FICO"             length = $10.
            hs   label = "Housing Starts"
            ump  label = "Unemployment Rate"
     ;
@@ -228,7 +265,7 @@ ods powerpoint exclude all;
   data p_c1_&d_pd p_c2_&d_pd;
     set PD_DATA.out_&d_pd;
     where orig_dte < "30Mar2016"d;
-    attrib fico label = "FICO"             length = $10.
+    attrib FICO label = "FICO"             length = $10.
            hs   label = "Housing Starts"
            ump  label = "Unemployment Rate"
     ;
@@ -251,44 +288,86 @@ ods powerpoint exclude all;
 /*     if c2 then group = "&n_c2"; */
 /*   run; */
 %mend predict;
-
+/*
 options nodate;
 ods powerpoint file = "&p_report/model1.ppt"
                style = Sapphire;
-ods rtf file = "&p_report/model1.rtf"
+ods html file = "&p_report/model1.html"
         style = Sapphire;
-ods rtf exclude all;
+ods html exclude all;
+
 %predict(DEL);
 %predict(CUR);
 
-ods rtf close;
+ods html close;
 ods powerpoint close;
+*/
 
-data PD_DATA.out_sub;
-  merge del_c1_plot2(rename = (P_Next_statCUR_Mean = DEL_to_CUR P_Next_statDEL_Mean = DEL_to_DEL 
-                             P_Next_statPPY_Mean = DEL_to_PPY P_Next_statSDQ_Mean = DEL_to_SDQ)) 
-      cur_c1_plot2(rename = (P_Next_statCUR_Mean = CUR_to_CUR P_Next_statDEL_Mean = CUR_to_DEL 
-                             P_Next_statPPY_Mean = CUR_to_PPY P_Next_statSDQ_Mean = CUR_to_SDQ));
-  by yqtr;
-run;
+%macro out_matrix(num);
 
-data PD_DATA.out_prm;
-  merge del_c2_plot2(rename = (P_Next_statCUR_Mean = DEL_to_CUR P_Next_statDEL_Mean = DEL_to_DEL 
-                             P_Next_statPPY_Mean = DEL_to_PPY P_Next_statSDQ_Mean = DEL_to_SDQ)) 
-      cur_c2_plot2(rename = (P_Next_statCUR_Mean = CUR_to_CUR P_Next_statDEL_Mean = CUR_to_DEL 
-                             P_Next_statPPY_Mean = CUR_to_PPY P_Next_statSDQ_Mean = CUR_to_SDQ));
-  by yqtr;
-run;
+  data PD_DATA.&&&n_c&num;
+    length curr_stat $3.;
+    set del_c&num._plot2(rename = (P_Next_statCUR_Mean = CUR P_Next_statDEL_Mean = DEL 
+                                   P_Next_statPPY_Mean = PPY P_Next_statSDQ_Mean = SDQ)
+                             in = d
+                         )
+        cur_c&num._plot2(rename = (P_Next_statCUR_Mean = CUR P_Next_statDEL_Mean = DEL 
+                                   P_Next_statPPY_Mean = PPY P_Next_statSDQ_Mean = SDQ)
+                             in = c
+                         );
+    by yqtr;
+    if d then curr_stat = "DEL";
+    if c then curr_stat = "CUR";
+    
+    if first.yqtr then do;
+      output;
+      curr_stat = "PPY";
+      CUR = 0; DEL = 0; PPY = 1; SDQ = 0;
+      output;
+      curr_stat = "SDQ";
+      CUR = 0; DEL = 0; PPY = 0; SDQ = 1;
+      output;
+    end;
+    else output;
+  run;
+  
+  proc sort data = PD_DATA.&&&n_c&num;
+    by yqtr curr_stat;
+  run;
+%mend out_matrix;
 
+%out_matrix(1);
+%out_matrix(2);
+
+/*
 proc export data = PD_DATA.out_sub outfile = "&p_pddata/sub.csv" dbms = csv;
 run;
 proc export data = PD_DATA.out_prm outfile = "&p_pddata/prime.csv" dbms = csv;
 run;
 
+data out_act;
+  set PD_DATA.out_del(in = d) PD_DATA.out_cur(in = c);
+  if d then _to = "DEL_to_";
+  if c then _to = "CUR_to_";
+  state = cat(_to, next_stat);
+  where orig_dte < "30Mar2016"d;
+  if 0 < &seg < &score then group = "sub-prime";
+    if &score <= &seg then group = "prime";
+  if next_stat = "SDQ" then def_flg = 1;
+    else def_flg = 0;
+run;
+
+ods html file = "&p_pddata/out_of_sample.html";
+proc freq data = out_act;
+  table group*yqtr*def_flg / nocol nopercent;
+run;
+ods html close;
+
+*/
 /*
 
 %let d_train = PD_DATA.train_cur;
-  data test(keep = FICO next_stat c_amt c_fico c_oltv c_dti);
+  data test(keep = FICO next_stat c_amt c_FICO c_OLTV c_dti);
     set &d_train;
     length FICO $10;
     format yqtr yyq.;
@@ -299,8 +378,8 @@ run;
           hpi = "House Price Index"
           ;
     attrib c_amt  label = "Original Loan Amount"   length = $20.
-           c_fico label = "Credit Score Cohort"    length = $10.
-           c_oltv label = "Original Loan to Value" length = $10.
+           c_FICO label = "Credit Score Cohort"    length = $10.
+           c_OLTV label = "Original Loan to Value" length = $10.
            c_dti  label = "Debt-to-Income Cohort"  length = $10.
            ;
           
@@ -318,15 +397,15 @@ run;
       else if Orig_amt lt 450000 then c_amt = "[400,000-450,000)";
       else if Orig_amt ge 450000 then c_amt = "[450,000+)";
     
-    if cscore_b le 349 then c_fico = "[0-350)";
-      else if cscore_b le 619 then c_fico = "[350,619]";
-      else if cscore_b le 639 then c_fico = "[620,639]";
-      else if cscore_b le 659 then c_fico = "[640,659]";
-      else if cscore_b le 679 then c_fico = "[660,679]";
-      else if cscore_b le 699 then c_fico = "[680,699]";
-      else if cscore_b le 719 then c_fico = "[700,719]";
-      else if cscore_b le 739 then c_fico = "[720,739]";
-      else if cscore_b ge 740 then c_fico = "[740+)";
+    if cscore_b le 349 then c_FICO = "[0-350)";
+      else if cscore_b le 619 then c_FICO = "[350,619]";
+      else if cscore_b le 639 then c_FICO = "[620,639]";
+      else if cscore_b le 659 then c_FICO = "[640,659]";
+      else if cscore_b le 679 then c_FICO = "[660,679]";
+      else if cscore_b le 699 then c_FICO = "[680,699]";
+      else if cscore_b le 719 then c_FICO = "[700,719]";
+      else if cscore_b le 739 then c_FICO = "[720,739]";
+      else if cscore_b ge 740 then c_FICO = "[740+)";
     
     if dti lt 10 then c_dti = "[0-10)";
       else if dti lt 20 then c_dti = "[10,20)";
@@ -337,15 +416,15 @@ run;
       else if dti lt 70 then c_dti = "[60,70)";
       else if dti ge 70 then c_dti = "[70+)"; 
 
-    if oltv lt 60 then c_oltv = "[0-60)";
-      else if oltv lt 65 then c_oltv = "[60,65)";
-      else if oltv lt 70 then c_oltv = "[65,70)";
-      else if oltv lt 75 then c_oltv = "[70,75)";
-      else if oltv lt 80 then c_oltv = "[75,80)";
-      else if oltv lt 85 then c_oltv = "[80,85)";
-      else if oltv lt 90 then c_oltv = "[85,90)";
-      else if oltv lt 95 then c_oltv = "[90,95)";
-      else if oltv ge 95 then c_oltv = "[95+)"; 
+    if OLTV lt 60 then c_OLTV = "[0-60)";
+      else if OLTV lt 65 then c_OLTV = "[60,65)";
+      else if OLTV lt 70 then c_OLTV = "[65,70)";
+      else if OLTV lt 75 then c_OLTV = "[70,75)";
+      else if OLTV lt 80 then c_OLTV = "[75,80)";
+      else if OLTV lt 85 then c_OLTV = "[80,85)";
+      else if OLTV lt 90 then c_OLTV = "[85,90)";
+      else if OLTV lt 95 then c_OLTV = "[90,95)";
+      else if OLTV ge 95 then c_OLTV = "[95+)"; 
     
     
     if 0 < cscore_b < &score then FICO = 'Sub-Prime';
@@ -361,7 +440,7 @@ run;
   run;
   
   
-  ods rtf5 select all;
+  ods html5 select all;
   title "Contingency table of &var";
   footnote j = l "Current State: CUR";
   footnote2 j = l "Next State: DEL";
@@ -378,19 +457,19 @@ run;
   run;
   title;
   
-  ods rtf5 select none;
+  ods html5 select none;
 %mend s_plot;
 
 options nodate;
-ods rtf5 file = "&p_report/sasoutput.rtf" style = Sapphire;
-ods rtf5 select none;
+ods html5 file = "&p_report/sasoutput.html" style = Sapphire;
+ods html5 select none;
 %s_plot(AMT);
 %s_plot(DTI);
 %s_plot(OLTV);
 %s_plot(FICO);
-ods rtf5 close;
+ods html5 close;
 
 
 */
 
-/* ods rtf5 file = "&p_report/ "; */
+/* ods html5 file = "&p_report/ "; */
