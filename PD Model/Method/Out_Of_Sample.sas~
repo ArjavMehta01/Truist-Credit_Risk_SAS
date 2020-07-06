@@ -189,7 +189,7 @@ run;
     %let n_next = Default;
   %end;
 
-
+  ods output ParameterEstimates = &d_pd._subprime(keep = variable response  estimate probchisq);
   proc logistic data = PD_DATA.train_&d_pd._sub ;
     class next_stat (ref = "&d_pd")  / param = glm;
     model next_stat = &&&d_pd._var / link = glogit rsquare cl;
@@ -312,6 +312,8 @@ run;
     %let next = SDQ;
     %let n_next = Default;
   %end;
+  
+  ods output ParameterEstimates = &d_pd._prime(keep = variable response  estimate probchisq);
   proc logistic data = PD_DATA.train_del_prm;
     class next_stat (ref = "&d_pd") fico / param = glm;
     model next_stat = &&&d_pd._var / link = glogit rsquare cl;
@@ -403,8 +405,20 @@ run;
 /* CURRENT SUBPRIME */
 
 
-%let d_pd = CUR;
+%let CUR_var = CLTV Dti Cscore_b purpose Curr_rte HS GDP;
+%let DEL_var = Curr_rte CLTV Cscore_b QDT_UMP ;
 
+%let d_pd = CUR;
+  %if "&d_pd" = "CUR" %then %do;
+    %let next = DEL;
+    %let n_next = Delinquent;
+  %end;
+  %if "&d_pd" = "DEL" %then %do;
+    %let next = SDQ;
+    %let n_next = Default;
+  %end;
+
+ods output ParameterEstimates = &d_pd._subprime(keep = variable response  estimate probchisq);
   proc logistic data = PD_DATA.train_cur_sub ;
     class next_stat (ref = "&d_pd") Purpose  / param = glm;
     model next_stat = &&&d_pd._var / link = glogit rsquare cl;
@@ -524,6 +538,7 @@ run;
     %let n_next = Default;
   %end;
 
+ods output ParameterEstimates = &d_pd._prime(keep = variable response estimate probchisq);
   proc logistic data = PD_DATA.train_cur_prm ;
     class next_stat (ref = "&d_pd") Purpose  / param = glm;
     model next_stat = &&&d_pd._var / link = glogit rsquare cl;
@@ -591,7 +606,42 @@ run;
 
 
 
-
+ title "Parameter Estimates (Next: &next)";
+  footnote j = l "Data: &d_pd. Group: Prime";
+  proc report data = &d_pd._prime (where = (response = "&next"));
+    columns variable response  estimate probchisq;
+    define variable / "Variable" display;
+    define response / "Response" display;
+/*     define classval0 / "Class" display; */
+    define estimate / display;
+    define probchisq / display;
+    compute probchisq;
+      if probchisq > 0.05 then
+        call define(_row_, "style", "style={foreground=cxde2d26}");
+    endcomp;
+  run;
+  title;
+  footnote;
+  
+  
+  
+  
+  title "Parameter Estimates (Next: PPY)";
+  footnote j = l "Data: &d_pd. Group: Prime";
+  proc report data = &d_pd._prime (where = (response = "PPY"));
+    columns variable response  estimate probchisq;
+    define variable / "Variable" display;
+    define response / "Response" display;
+/*     define classval0 / "Class" display; */
+    define estimate / display;
+    define probchisq / display;
+    compute probchisq;
+      if probchisq > 0.05 then
+        call define(_row_, "style", "style={foreground=cxde2d26}");
+    endcomp;
+  run;
+  title;
+  footnote;
 
 
 
