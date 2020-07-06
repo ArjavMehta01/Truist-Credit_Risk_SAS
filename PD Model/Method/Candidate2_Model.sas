@@ -4,6 +4,7 @@
 /* Reading in Unemployment data from Google Drive */
 
 
+
 %let id02 = %nrstr(1fP2Ggzb-Ry20sgsQXJ3tkz9G1UPSDJbZ);
 %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id02;
 filename url_file url "&_url";
@@ -696,7 +697,6 @@ run;
   run;
   title;
   footnote;
-  ods powerpoint exclude all;
   
   ods output CrossTabFreqs = subcur_qtr_f(where = (next_stat = "&next")
                                         keep = next_stat yqtr colpercent
@@ -742,6 +742,14 @@ run;
 
 
 %let d_pd = CUR;
+  %if "&d_pd" = "CUR" %then %do;
+    %let next = DEL;
+    %let n_next = Delinquent;
+  %end;
+  %if "&d_pd" = "DEL" %then %do;
+    %let next = SDQ;
+    %let n_next = Default;
+  %end;
 
   proc logistic data = PD_DATA.train_cur_prm ;
     class next_stat (ref = "&d_pd") Purpose  / param = glm;
@@ -801,7 +809,7 @@ run;
   run;
   title;
   footnote;
-  ods powerpoint exclude all;
+ 
   
   ods output CrossTabFreqs = prmcur_qtr_f(where = (next_stat = "&next")
                                         keep = next_stat yqtr colpercent
@@ -848,12 +856,3 @@ run;
  proc freq data = PD_DATA.test_del_sub;
  table next_stat*yqtr;
  run;
-
-
-
-
-
-
-  
-
-
