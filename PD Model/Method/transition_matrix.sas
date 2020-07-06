@@ -1,31 +1,37 @@
 /* Author: Zheng */
 /* Purpose: Generate the marginal PD from transition matrix */
 
+%macro transition_matrix(input, output,                   /* input and output dataset */
+                         date = yqtr,                     /* name of date variable */
+                         initial = CUR,                   /* initial state: set up to 100% */
+                         response = SDQ,                  /* response variable */
+                         absorb = 1, plot = 1);           /* options: 1 for True, 0 for False */
 
-%macro transition_matrix(input, output, date = yqtr, response = SDQ, plot = TRUE);
-
-
-%let input = PD_DATA.prime;
-%let date = yqtr;
-%let response = SDQ;
-
-
-  proc sort data = &input nodupkey out = tmp;
+* Prepare the input dataset;
+  proc sort data = &input nodupkey out = plot(keep = &date);
     by &date;
   run;
-  proc contents data = tmp varnum noprint out = var_list(keep = name);
+  proc sort data = &input out = tmp;
+    by &date curr_stat;
+  run;
+  proc contents data = tmp varnum noprint out = var_list(keep = name format);
   run;
   data _null_;
     set var_list end = last;
-    where name ^in("curr_stat" "&date");
-    call symputx('var'||left(_n_), name);
-    if last then call symputx('n', _n_);
+    where name ^in("curr_stat");
+    if name ne "&date" then
+      do;
+        call symputx('var'||left(_n_), name);
+        if name eq "&initial" then call symputx('n_i', _n_);
+        if name eq "&response" then call symputx('n_r', _n_);
+      end;
+      else call symputx('f_date', format);
+    if last then call symputx('n', _n_-1);
   run;
   %let var = ;
   %do i = 1 %to &n;
     %let var = &var &&var&i;
   %end;
-
   data tmp;
     set tmp;
     by &date;
@@ -39,63 +45,88 @@
     end;
     drop _:;
   run;
-
-  data tmp_2;
+  
+  data tmp;
     merge tmp(in = a) &input.(in = b);
     by &date curr_stat;
     if a;
   run;
-
+  
+* Calculate the conditional PD;
+  %let V_var = %sysfunc(tranwrd(%quote(&var), %str( ), %str(||)));
+  %let L_var = %sysfunc(tranwrd(%quote(&var), %str( ), %str(" ")));
   proc iml;
-/* Transition matrix. Columns are next state; rows are current state */
-/*     Null  H   HT  HTH */
+    use tmp;
+    read all;
 
-use tmp_2;
-read all;
+    N = &V_var;
+    R = &response;
+    S = repeat(0, &n);
+    S[&n_i] = 1;
+    size = nrow(N);
+    Con_pd = repeat(0, &n)`;
+    PD = {0};
+    
+    do i = 1 to size/&n;
+      m = N[&n*(i-1)+1 : &n*i,];
+      State = m`*S;
+      if i < size/&n then do;
+        do j = 1 to &n;
+          v0 = R[&n*(i-1)+1 : &n*i];
+          v1 = R[&n*i+1 : &n*(i+1)];
+          t = v0[j];
+          %if &absorb %then %do;
+            if j = &n_r then tmp_pd = m[j,]*v1;
+              else tmp_pd = m[j,]*v1/(1-v0[j]);
+          %end;
+          %else %do;
+            tmp_pd = m[j,]*v1/(1-v0[j]);
+          %end;
+          Con_pd = Con_pd || tmp_pd;
+        end;
+        PD = PD || Con_pd[&n*i+1 : &n*(i+1)]`*State;
+      end;
+    end;
+    PD = PD`;
+    N = &date || N || Con_pd`;
+    create &output from N[c = {"Date" "&L_var" "Conditional PD"}];
+      append from N;
+    close &output;
+    
+    create plot_pd from PD[c = {"PD"}];
+      append from PD;
+    close plot_pd;
+  quit;
 
-       
-N =  %sysfunc(tranwrd(%quote(&var), %str( ), %str(||) ));
+* Generate the output dataset;
+  data &output;
+    set &output;
+    format date &f_date..;
+  run;
+  data &output._PD;
+    set plot;
+    set plot_pd;
+    if _n_ ne 1;
+    format pd percent10.4;
+  run;
 
-print N[L="Transition Matrix"];
-quit;
-
-%let varlist = %sysfunc(tranwrd(%quote(&var), %str( ), %str(||)));
-%put &varlist;
-
+* Plot the PD;
+  %if &plot %then %do;
+    title "Predicted probability of &response";
+    footnote j = l "Data: &input";
+    proc sgplot data = &output._PD;
+      series x = &date y = pd;
+      xaxis label = "Time" grid;
+      yaxis label = "Propability of &response (%)" grid;
+    run;
+    title;
+    footnote;
+  %end;
 %mend transition_matrix;
 
 
 %transition_matrix(PD_DATA.prime, prime);
+%transition_matrix(PD_DATA.sub_prime, sub_prime);
 
 
-
-/* data tmp; */
-/*   set PD_DATA.out_del(in = d) PD_DATA.out_cur(in = c); */
-/*   if d then _to = "DEL_to_"; */
-/*   if c then _to = "CUR_to_"; */
-/*   state = cat(_to, next_stat); */
-/*   where orig_dte < "30Mar2016"d; */
-/*   if 0 < &seg < &score then group = "sub-prime"; */
-/*     if &score <= &seg then group = "prime"; */
-/* run; */
-/*  */
-/* proc sort data = tmp(keep = act_date yqtr loan_id state group); */
-/*   by loan_id act_date; */
-/* run; */
-/*  */
-/* proc sort data = tmp; */
-/*   by act_date; */
-/* run; */
-/*  */
-/* data _tmp; */
-/*   set PD_DATA.out_del; */
-/*   where orig_dte < "30Mar2016"d; */
-/*   if 0 < &seg < &score ;run; */
-/*  */
-/* proc sort data =_tmp; */
-/*   by loan_id yqtr; */
-/* run; */
-/*  */
-/* proc freq data = tmp(where = (group = "sub-prime")); */
-/* table yqtr*state; */
-/* run; */
+quit;

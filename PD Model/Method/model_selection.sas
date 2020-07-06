@@ -340,9 +340,9 @@ ods powerpoint close;
 %out_matrix(2);
 
 /*
-proc export data = PD_DATA.out_sub outfile = "&p_pddata/sub.csv" dbms = csv;
+proc export data = PD_DATA.prime outfile = "&p_pddata/prime.csv" dbms = csv;
 run;
-proc export data = PD_DATA.out_prm outfile = "&p_pddata/prime.csv" dbms = csv;
+proc export data = PD_DATA.sub_prime outfile = "&p_pddata/sub.csv" dbms = csv;
 run;
 
 data out_act;
