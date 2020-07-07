@@ -552,18 +552,19 @@ ods output ParameterEstimates = &d_pd._prime(keep = variable response estimate p
     %include "&p_PDDATA./out_prm_cur_tmp.sas";
   run;
   
-  
-  * Getting the output data;
+
+
+* Getting the output data;
   ods output OneWayFreqs = out_prmcur_tmp_f(keep = next_stat percent);
-  proc freq data = out_prmcur_tmp;
-    tables next_stat;
+  proc freq data = out_prmcur_tmp ;
+    table next_stat;
   run;
   ods output Summary = out_prmcur_tmp_m(keep = label_: p_:);
   proc means data = out_prmcur_tmp mean;
     var p_:;
     weight act_upb;
   run;
-  proc transpose data = out_prmcur_tmp_m 
+  proc transpose data = out_prmcur_tmp_m
                   out = out_prmcur_tmp_m(keep = _name_ col1 
                             rename = (_name_ = p_next_stat col1 = predict)
                               );
@@ -577,27 +578,111 @@ ods output ParameterEstimates = &d_pd._prime(keep = variable response estimate p
     keep next_stat predict;
   run;
   
-  %let out_prmcur = &CUR &DEL &PPY ;
-  %put &out_prmcur;
+* ChiSqr test;
+
+%let num = 1;
+
+%if "&d_pd" = "DEL" %then %do;
+  %let c&num = &CUR &DEL &PPY &SDQ;
+%end;
+%if "&d_pd" = "CUR" %then %do;
+  %let c&num = &CUR &DEL &PPY;
+%end;
+  %put Estimated Probability: &&&c&num;
+  ods output OneWayChiSq = out_prmcur_tmp_chi(keep = label1 cvalue1);
+  proc freq data = out_prmcur_tmp;
+    table next_stat / chisq
+    testp = (&&&c&num);
+  run;
+  data _null_;
+    set out_prmcur_tmp_chi;
+    call symputx('K'||left(_n_), label1);
+    call symputx('V'||left(_n_), cvalue1);
+  run;
+*******************************************************************
+* Comparation plot;
+  ods output CrossTabFreqs = c&num._plot(where = (next_stat = "&next")
+                                          keep = next_stat yqtr colpercent
+                                        rename = (colpercent = historic)
+                                        );
+  proc freq data = out_prmcur_tmp;
+    table next_stat*yqtr;
+  run;
+  proc sort data = out_prmcur_tmp;
+    by yqtr;
+  run;
+  ods output Summary = &d_pd._out_prmcur_plot2(keep = yqtr P_next_stat:);
+  proc means data = out_prmcur_tmp mean;
+    var p_:;
+    by yqtr;
+    weight act_upb;
+  run;
+  proc sort data = c&num._plot;
+    by yqtr;
+  run;
+  
+  data outcur_plot;
+    merge c&num._plot &d_pd._out_prmcur_plot2;
+    by yqtr;
+    predict = predict*100;
+  run;
+  
+* Prepare for output;
   proc sql;
-    create table work.out_prmcur_tmp_r as
+    create table work.c&num._r as
     select f.next_stat "Next State",
-           percent "Actual Probability (%)",
-           predict "Predicted Probability (%)"
+           percent "Actual (%)",
+           predict "Predicted (%)"
       from work.out_prmcur_tmp_m as m inner join work.out_prmcur_tmp_f as f
         on m.next_stat = f.next_stat
       order by f.next_stat
       ;
   quit;
-  title "One Way Chi-Square Test of &d_pd Data";
-  footnote j = l "Group: Sub-Prime";
-  proc freq data = out_prmcur_tmp;
-    table next_stat / chisq
-    testp = (&out_prmcur);
+  proc transpose data = c&num._r out = c&num._r(drop = _name_);
+    id next_stat;
   run;
+
+* Output the results;
+  
+  title "Overall Prediction";
+  proc print data = c&num._r noobs;
+    format _numeric_ 8.2;
+  run;  
   title;
-  footnote;
- 
+
+
+
+ data PD_DATA.xyz;
+    length curr_stat $3.;
+   
+    set &d_pd._out_prmcur_plot2(rename = (P_Next_statCUR_Mean = CUR P_Next_statDEL_Mean = DEL 
+                                   P_Next_statPPY_Mean = PPY P_Next_statSDQ_Mean = SDQ)
+                             in = c
+                         );
+    by yqtr;
+    if d then curr_stat = "DEL";
+    if c then curr_stat = "CUR";
+    
+    if first.yqtr then do;
+      output;
+      curr_stat = "PPY";
+      CUR = 0; DEL = 0; PPY = 1; SDQ = 0;
+      output;
+      curr_stat = "SDQ";
+      CUR = 0; DEL = 0; PPY = 0; SDQ = 1;
+      output;
+    end;
+    else output;
+  run;
+  
+  proc sort data = PD_DATA.xyz;
+    by yqtr curr_stat;
+  run;
+
+
+
+proc export data = PD_DATA.xyz outfile = "&p_pddata/xyz.csv" dbms = csv;
+run;
 
 
 
@@ -606,43 +691,104 @@ ods output ParameterEstimates = &d_pd._prime(keep = variable response estimate p
 
 
 
- title "Parameter Estimates (Next: &next)";
-  footnote j = l "Data: &d_pd. Group: Prime";
-  proc report data = &d_pd._prime (where = (response = "&next"));
-    columns variable response  estimate probchisq;
-    define variable / "Variable" display;
-    define response / "Response" display;
+
+
+
+
+
+
+
+
+
+/*   ods output OneWayFreqs = out_prmcur_tmp_f(keep = next_stat percent); */
+/*   proc freq data = out_prmcur_tmp; */
+/*     tables next_stat; */
+/*   run; */
+/*   ods output Summary = out_prmcur_tmp_m(keep = label_: p_:); */
+/*   proc means data = out_prmcur_tmp mean; */
+/*     var p_:; */
+/*     weight act_upb; */
+/*   run; */
+/*   proc transpose data = out_prmcur_tmp_m  */
+/*                   out = out_prmcur_tmp_m(keep = _name_ col1  */
+/*                             rename = (_name_ = p_next_stat col1 = predict) */
+/*                               ); */
+/*   run; */
+/*   data out_prmcur_tmp_m; */
+/*     set out_prmcur_tmp_m; */
+/*     _idx = find(p_next_stat, "_mean", "i"); */
+/*     next_stat = substr(p_next_stat, _idx-3, 3); */
+/*     predict = round(predict*100, 0.0001); */
+/*     call symputx (trim(next_stat), predict); */
+/*     keep next_stat predict; */
+/*   run; */
+/*    */
+/*   %let out_prmcur = &CUR &DEL &PPY ; */
+/*   %put &out_prmcur; */
+/*   proc sql; */
+/*     create table work.out_prmcur_tmp_r as */
+/*     select f.next_stat "Next State", */
+/*            percent "Actual Probability (%)", */
+/*            predict "Predicted Probability (%)" */
+/*       from work.out_prmcur_tmp_m as m inner join work.out_prmcur_tmp_f as f */
+/*         on m.next_stat = f.next_stat */
+/*       order by f.next_stat */
+/*       ; */
+/*   quit; */
+/*   title "One Way Chi-Square Test of &d_pd Data"; */
+/*   footnote j = l "Group: Sub-Prime"; */
+/*   proc freq data = out_prmcur_tmp; */
+/*     table next_stat / chisq */
+/*     testp = (&out_prmcur); */
+/*   run; */
+/*   title; */
+/*   footnote; */
+/*   */
+/*  */
+/*  */
+/*  */
+
+
+
+/*  */
+/*  */
+/*  title "Parameter Estimates (Next: &next)"; */
+/*   footnote j = l "Data: &d_pd. Group: Prime"; */
+/*   proc report data = &d_pd._prime (where = (response = "&next")); */
+/*     columns variable response  estimate probchisq; */
+/*     define variable / "Variable" display; */
+/*     define response / "Response" display; */
 /*     define classval0 / "Class" display; */
-    define estimate / display;
-    define probchisq / display;
-    compute probchisq;
-      if probchisq > 0.05 then
-        call define(_row_, "style", "style={foreground=cxde2d26}");
-    endcomp;
-  run;
-  title;
-  footnote;
-  
-  
-  
-  
-  title "Parameter Estimates (Next: PPY)";
-  footnote j = l "Data: &d_pd. Group: Prime";
-  proc report data = &d_pd._prime (where = (response = "PPY"));
-    columns variable response  estimate probchisq;
-    define variable / "Variable" display;
-    define response / "Response" display;
+/*     define estimate / display; */
+/*     define probchisq / display; */
+/*     compute probchisq; */
+/*       if probchisq > 0.05 then */
+/*         call define(_row_, "style", "style={foreground=cxde2d26}"); */
+/*     endcomp; */
+/*   run; */
+/*   title; */
+/*   footnote; */
+/*    */
+/*    */
+/*    */
+/*    */
+/*   title "Parameter Estimates (Next: PPY)"; */
+/*   footnote j = l "Data: &d_pd. Group: Prime"; */
+/*   proc report data = &d_pd._prime (where = (response = "PPY")); */
+/*     columns variable response  estimate probchisq; */
+/*     define variable / "Variable" display; */
+/*     define response / "Response" display; */
 /*     define classval0 / "Class" display; */
-    define estimate / display;
-    define probchisq / display;
-    compute probchisq;
-      if probchisq > 0.05 then
-        call define(_row_, "style", "style={foreground=cxde2d26}");
-    endcomp;
-  run;
-  title;
-  footnote;
-
+/*     define estimate / display; */
+/*     define probchisq / display; */
+/*     compute probchisq; */
+/*       if probchisq > 0.05 then */
+/*         call define(_row_, "style", "style={foreground=cxde2d26}"); */
+/*     endcomp; */
+/*   run; */
+/*   title; */
+/*   footnote; */
+/*  */
 
 
 
