@@ -473,3 +473,35 @@ ods html5 close;
 */
 
 /* ods html5 file = "&p_report/ "; */
+
+
+
+
+%macro act_PD();
+* Get the historical PD for out-of-sample dataset;
+  data act_prime act_sub_prime;
+    set PD_DATA.out_cur PD_DATA.out_del;
+    where orig_dte < "30Mar2016"d;
+    if 0 < cscore_b < 670 then output act_sub_prime;
+      if 670 <= cscore_b then output act_prime;
+    keep yqtr next_stat;
+  run;
+  
+  title "Sub-prime";
+  proc freq data = act_sub_prime;
+    table yqtr*next_stat / nocol nopercent nofreq;
+  run;
+  title "Prime";
+  proc freq data = act_prime;
+    table yqtr*next_stat / nocol nopercent nofreq;
+  run;
+  
+  title "SDQ as next, 2016Q1";
+  proc print data = PD_DATA.out_cur;
+    where next_stat = "SDQ" and orig_dte < "30Mar2016"d;
+  run;
+  proc print data = PD_DATA.out_del;
+    where next_stat = "SDQ" and orig_dte < "30Mar2016"d;
+  run;
+%mend act_PD;
+

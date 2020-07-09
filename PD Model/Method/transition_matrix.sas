@@ -52,7 +52,7 @@
     if a;
   run;
   
-* Calculate the conditional PD;
+* Calculate the conditional probability;
   %let V_var = %sysfunc(tranwrd(%quote(&var), %str( ), %str(||)));
   %let L_var = %sysfunc(tranwrd(%quote(&var), %str( ), %str(" ")));
   proc iml;
@@ -61,15 +61,15 @@
 
     N = &V_var;
     R = &response;
-    S = repeat(0, &n);
-    S[&n_i] = 1;
+    State = repeat(0, &n);
+    State[&n_i] = 1;
     size = nrow(N);
     Con_pd = repeat(0, &n)`;
     PD = {0};
     
     do i = 1 to size/&n;
       m = N[&n*(i-1)+1 : &n*i,];
-      State = m`*S;
+      State = m`*State;
       if i < size/&n then do;
         do j = 1 to &n;
           v0 = R[&n*(i-1)+1 : &n*i];
@@ -77,7 +77,7 @@
           t = v0[j];
           %if &absorb %then %do;
             if j = &n_r then tmp_pd = m[j,]*v1;
-              else tmp_pd = m[j,]*v1/(1-v0[j]);
+              else tmp_pd = m[j,]*v1/(1-v0[j]);   /* ? */
           %end;
           %else %do;
             tmp_pd = m[j,]*v1/(1-v0[j]);
@@ -89,11 +89,11 @@
     end;
     PD = PD`;
     N = &date || N || Con_pd`;
-    create &output from N[c = {"Date" "&L_var" "Conditional PD"}];
+    create &output from N[c = {"Date" "&L_var" "Conditional"}];
       append from N;
     close &output;
     
-    create plot_pd from PD[c = {"PD"}];
+    create plot_pd from PD[c = {"Prob"}];
       append from PD;
     close plot_pd;
   quit;
@@ -103,19 +103,19 @@
     set &output;
     format date &f_date..;
   run;
-  data &output._PD;
+  data &output._plot;
     set plot;
     set plot_pd;
     if _n_ ne 1;
-    format pd percent10.4;
+    format prob percent10.4;
   run;
 
-* Plot the PD;
+* Plot the probability chart;
   %if &plot %then %do;
     title "Predicted probability of &response";
     footnote j = l "Data: &input";
-    proc sgplot data = &output._PD;
-      series x = &date y = pd;
+    proc sgplot data = &output._plot;
+      series x = &date y = prob;
       xaxis label = "Time" grid;
       yaxis label = "Propability of &response (%)" grid;
     run;
@@ -125,8 +125,10 @@
 %mend transition_matrix;
 
 
-%transition_matrix(PD_DATA.prime, prime);
-%transition_matrix(PD_DATA.sub_prime, sub_prime);
+%transition_matrix(PD_DATA.prime, prime_sdq);
+/* %transition_matrix(PD_DATA.prime, prime_ppy, response = PPY); */
+%transition_matrix(PD_DATA.sub_prime, sub_prime_sdq);
+/* %transition_matrix(PD_DATA.sub_prime, sub_prime_ppy, response = PPY); */
 
 
 quit;
