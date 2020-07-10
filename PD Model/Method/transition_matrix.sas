@@ -5,7 +5,9 @@
                          date = yqtr,                     /* name of date variable */
                          initial = CUR,                   /* initial state: set up to 100% */
                          response = SDQ,                  /* response variable */
-                         absorb = 1, plot = 1);           /* options: 1 for True, 0 for False */
+                         absorb = SDQ PPY,                /* absorbing state */
+                         plot = 1)                        /* options: 1 for True, 0 for False */
+                         / minoperator;  
 
 * Prepare the input dataset;
   proc sort data = &input nodupkey out = plot(keep = &date);
@@ -29,8 +31,12 @@
     if last then call symputx('n', _n_-1);
   run;
   %let var = ;
+  %let n_a = ;
   %do i = 1 %to &n;
     %let var = &var &&var&i;
+    %if &&var&i in &absorb %then %do;
+      %let n_a = &n_a &i;
+    %end;
   %end;
   data tmp;
     set tmp;
@@ -64,37 +70,32 @@
     State = repeat(0, &n);
     State[&n_i] = 1;
     size = nrow(N);
-    Con_pd = repeat(0, &n)`;
+    cum_pd = repeat(0, &n)`;
     PD = {0};
-    
+    sur = {1};
+    Prob = {};
     do i = 1 to size/&n;
       m = N[&n*(i-1)+1 : &n*i,];
       State = m`*State;
       if i < size/&n then do;
         do j = 1 to &n;
-          v0 = R[&n*(i-1)+1 : &n*i];
           v1 = R[&n*i+1 : &n*(i+1)];
-          t = v0[j];
-          %if &absorb %then %do;
-            if j = &n_r then tmp_pd = m[j,]*v1;
-              else tmp_pd = m[j,]*v1/(1-v0[j]);   /* ? */
-          %end;
-          %else %do;
-            tmp_pd = m[j,]*v1/(1-v0[j]);
-          %end;
-          Con_pd = Con_pd || tmp_pd;
+          tmp_pd = m[j,]*v1;
+          cum_pd = cum_pd || tmp_pd;
         end;
-        PD = PD || Con_pd[&n*i+1 : &n*(i+1)]`*State;
+        PD = PD || cum_pd[&n*i+1 : &n*(i+1)]`*State;
+        sur = sur || 1 - sum(State[{&n_a}]);
+        Prob = Prob || (PD[i+1] - PD[i]) / sur[i];
       end;
     end;
-    PD = PD`;
-    N = &date || N || Con_pd`;
+    Prob = Prob`;
+    N = &date || N || cum_pd`;
     create &output from N[c = {"Date" "&L_var" "Conditional"}];
       append from N;
     close &output;
     
-    create plot_pd from PD[c = {"Prob"}];
-      append from PD;
+    create plot_pd from Prob[c = {"Prob"}];
+      append from Prob;
     close plot_pd;
   quit;
 
@@ -104,9 +105,8 @@
     format date &f_date..;
   run;
   data &output._plot;
-    set plot;
+    set plot(firstobs = 2);
     set plot_pd;
-    if _n_ ne 1;
     format prob percent10.4;
   run;
 
@@ -126,9 +126,9 @@
 
 
 %transition_matrix(PD_DATA.prime, prime_sdq);
-/* %transition_matrix(PD_DATA.prime, prime_ppy, response = PPY); */
+%transition_matrix(PD_DATA.prime, prime_ppy, response = PPY);
 %transition_matrix(PD_DATA.sub_prime, sub_prime_sdq);
-/* %transition_matrix(PD_DATA.sub_prime, sub_prime_ppy, response = PPY); */
+%transition_matrix(PD_DATA.sub_prime, sub_prime_ppy, response = PPY);
 
 
 quit;
