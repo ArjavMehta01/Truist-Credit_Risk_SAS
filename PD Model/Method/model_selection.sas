@@ -105,27 +105,27 @@ run;
     %include "%sysfunc(getoption(work))/&num._tmp.sas";
   run;
 
-/* * Prediction for forcast; */
-/*   proc means data = c&num._&d_pd(drop = yqtr next_stat) mean; */
-/*     weight act_upb; */
-/*     output out = p_tmp_m(keep = &&&d_pd._var &seg _stat_ where = (_stat_ = "MEAN")); */
-/*   run; */
-/*   data _null_; */
-/*     set PD_DATA.out_&d_pd(obs = 1); */
-/*     if _n_ = 1 then call symputx ('p_macro', &&&d_pd._macro); */
-/*   run; */
-/*   data p_tmp; */
-/*     set p_tmp_m; */
-/*     &c_var = put(&v_var, c_&c_var..); */
-/*     &&&d_pd._macro = &p_macro; */
-/*     keep &&&d_pd._var &c_var; */
-/*   run; */
-/*   data p_c&num._&d_pd; */
-/*     set p_tmp; */
-/*     %include "%sysfunc(getoption(work))/&num._tmp.sas"; */
-/*     drop I_: U_:; */
-/*   run; */
-  
+* Prediction for forcast;
+  proc means data = c&num._&d_pd(drop = yqtr next_stat) mean;
+    weight act_upb;
+    output out = p_tmp_m(keep = &&&d_pd._var &seg _stat_ where = (_stat_ = "MEAN"));
+  run;
+  data _null_;
+    set PD_DATA.out_&d_pd(obs = 1);
+    if _n_ = 1 then call symputx ('p_macro', &&&d_pd._macro);
+  run;
+  data p_tmp;
+    set p_tmp_m;
+    &c_var = put(&v_var, c_&c_var..);
+    &&&d_pd._macro = &p_macro;
+    keep &&&d_pd._var &c_var;
+  run;
+  data p_c&num._&d_pd;
+    set p_tmp;
+    %include "%sysfunc(getoption(work))/&num._tmp.sas";
+    drop I_: U_:;
+  run;
+
 * Getting the output data;
   ods output OneWayFreqs = c&num._f(keep = next_stat percent);
   proc freq data = c&num._tmp;
@@ -151,13 +151,12 @@ run;
   run;
   
 * ChiSqr test;
-%if "&d_pd" = "DEL" %then %do;
-  %let c&num = &CUR &DEL &PPY &SDQ;
-%end;
-%if "&d_pd" = "CUR" %then %do;
-  %let c&num = &CUR &DEL &PPY;
-%end;
-  %put Estimated Probability: &&&c&num;
+  %if "&d_pd" = "DEL" %then %do;
+    %let c&num = &CUR &DEL &PPY &SDQ;
+  %end;
+  %if "&d_pd" = "CUR" %then %do;
+    %let c&num = &CUR &DEL &PPY;
+  %end;
   ods output OneWayChiSq = c&num._chi(keep = label1 cvalue1);
   proc freq data = c&num._tmp;
     table next_stat / chisq
@@ -217,21 +216,19 @@ run;
     format _numeric_ 8.2;
   run;  
   title;
-/*   title j = l "Group: &&&n_c&num"; */
-/*   proc sgplot data = c&num._plot; */
-/*     scatter x = yqtr y = historic / legendlabel = "Actual"; */
-/*     series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predicted"; */
-/*     inset ("&K1" = "&V1" */
-/*            "&K3" = "&V3") / border opaque; */
-/*     xaxis label = "Year" grid; */
-/*     yaxis label = "Probability of &n_next (%)" grid; */
-/*   run; */
-/*   title; */
+  title j = l "Group: &&&n_c&num";
+  proc sgplot data = c&num._plot;
+    scatter x = yqtr y = historic / legendlabel = "Actual";
+    series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predicted";
+    inset ("&K1" = "&V1"
+           "&K3" = "&V3") / border opaque;
+    xaxis label = "Year" grid;
+    yaxis label = "Probability of &n_next (%)" grid;
+  run;
+  title;
   ods powerpoint exclude all;  
   
 %mend test;
-%let d_pd = DEL;
-%let num = 1;
 
 %macro predict(d_pd);
 ods powerpoint exclude all;
@@ -297,7 +294,7 @@ ods html file = "&p_report/model1.html"
 ods html exclude all;
 
 %predict(DEL);
-/* %predict(CUR); */
+%predict(CUR);
 
 ods html close;
 ods powerpoint close;
@@ -476,11 +473,10 @@ ods html5 close;
 
 
 
-
 %macro act_PD();
 * Get the historical PD for out-of-sample dataset;
   data act_prime act_sub_prime;
-    set PD_DATA.out_cur PD_DATA.out_del;
+    set PD_DATA.test_cur PD_DATA.test_del;
     where orig_dte < "30Mar2016"d;
     if 0 < cscore_b < 670 then output act_sub_prime;
       if 670 <= cscore_b then output act_prime;
@@ -495,13 +491,4 @@ ods html5 close;
   proc freq data = act_prime;
     table yqtr*next_stat / nocol nopercent nofreq;
   run;
-  
-  title "SDQ as next, 2016Q1";
-  proc print data = PD_DATA.out_cur;
-    where next_stat = "SDQ" and orig_dte < "30Mar2016"d;
-  run;
-  proc print data = PD_DATA.out_del;
-    where next_stat = "SDQ" and orig_dte < "30Mar2016"d;
-  run;
 %mend act_PD;
-
