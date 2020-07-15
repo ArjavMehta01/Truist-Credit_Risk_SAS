@@ -39,7 +39,39 @@ filename url_file url "&_url";
   run;
   
   
+  %let id02 = %nrstr(1Pyf8AO44zzDxDUfSWdwi4Bi4wUNhybgb);
+  %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id02;
+  filename url_file url "&_url";
   
+  data GDP (keep = yqtr ggr gdp_var);
+  	infile url_file missover dsd  firstobs = 2;
+  	input chardate :$10. GDP_Var;
+  	date = input(chardate , mmddyy10.);
+  	label 
+  	GDP_Var = "US GDP"
+  	logP_GDP = "Log Transformation"
+  	MGT_GDP = "Monthly Growth Transformation"
+  	AGT_GDP = "Annual Growth Transformation"
+  	MRT_GDP = "Monthly Return Transformation"
+  	ART_GDP = "Annual Return Transformation"
+  	MDT_GDP = "Monthly Difference Transformation"
+  	pctchng_GDP = "Percentage Change"
+  	AG_GDP = "Annual Growth in Percent"
+  	;
+  	format logP_GDP MGT_GDP AGT_GDP MRT_GDP ART_GDP MDT_GDP comma10.5 pctchng_GDP AG_GDP percent10.2 date mmddyy10.;
+  	lagvar1 = lag(GDP_Var) ;
+  	lagvar12 = lag12(GDP_Var);
+  	logP_GDP = log(GDP_Var); /*Log transformation */
+  	Ggr = (gdp_var - lagvar1) / gdp_var;
+  	MGT_GDP = log ( GDP_Var / lagvar1 ); /*Quarterly Growth Transformation ( ln(Xt / Xt-1) ) */
+  	AGT_GDP = log ( GDP_Var / lagvar12 ); /*Annual Growth Transformation ( ln(Xt / Xt-4) )*/
+  	MRT_GDP= ( GDP_Var / lagvar1 ) ;/* Quarterly Return Transformation ( Xt / Xt-1 )*/
+  	ART_GDP = ( GDP_Var / lagvar1 ) ;/* Annual Return Transformation (Xt / Xt-4 )*/
+  	MDT_GDP = dif(lag(GDP_Var)); /* Quarterly Difference Transformation ( Xt - Xt-1 ) */	
+  	pctchng_GDP = ( ( GDP_Var / lag( GDP_Var ) ) ** 12 - 1 ) * 100; 
+  	AG_GDP = dif12( GDP_Var ) / lag12( GDP_Var ) * 100; /*computed percent change from the same period in the previous year*/
+   	yqtr = yyq(year(date),qtr(date));
+ run;
 
 /* Importing Macroeoconomics Data from GDrive*/
 
@@ -58,13 +90,29 @@ filename url_file url "&_url";
 
 filename url_file url "&_url";
 
-data macros (keep = date HPI );
+data macros (keep = date HPI UMP HS GDP PPI Permits QDT_UMP ART_UMP AG_UMP);
   infile url_file dsd firstobs = 2;
   format date mmddyy8.;
   input &mac_head;
-
+  label
+  	logP_UMP = "Log Transformation"
+  	QGT_UMP = "Quarterly Growth Transformation"
+  	QRT_UMP = "Quarterly Return Transformation"
+  	QDT_UMP = "Quarterly Difference Transformation"
+  	pctchng_UMP = "Percetnage Change"
+  	AG_UMP = "Annual Growth in Percent"
+  	;
+  	format yqtr yyq. logP_UMP QGT_UMP AGT_UMP QRT_UMP ART_UMP QDT_UMP comma10.5 pctchng_UMP AG_UMP percentN10.2 date ddmmyy10. 
+  	logP_UMP = log(UMP); /*Log transformation*/
+  	QGT_UMP = log ( UMP / lag (UMP) ); /*Quarterly Growth Transformation ( ln(Xt / Xt-1) )*/ 
+  	QRT_UMP = ( UMP / lagvar1 ) ;/* Quarterly Return Transformation ( Xt / Xt-1 ) */
+  	QDT_UMP = dif(UMP); /* Quarterly Difference Transformation ( Xt - Xt-1 ) */	
+  	pctchng_UMP = ( ( UMP / lag (UMP ) ) ** 12 - 1 ) * 100;
+  	AG_UMP = dif4( UMP ) / lag4( UMP ) * 100; /*computed percent change from the same period in the previous year*/
+  	
   if date ge '01JAN2006'd;
   drop _:;
+  yqtr = yyq(year(date),qtr(date));
 run;
 
 
@@ -73,6 +121,18 @@ run;
 proc sort data = Unemployment;
 by yqtr;
 run;
+
+data PD_DATA.train_cur;
+set PD_DATA.train_cur;
+UPB = act_upb / orig_amt ; 
+run;
+
+data PD_DATA.train_del;
+set PD_DATA.train_del;
+UPB = act_upb / orig_amt;
+run;
+
+
 
 /* Sorting Training and testing data sets */
 proc sort data = PD_DATA.train_cur;
@@ -99,7 +159,7 @@ by yqtr;
 run; 
 
 data temp_train_del;
-merge PD_DATA.train_del Unemployment ;
+merge PD_DATA.train_del Unemployment;
 by yqtr;
 run; 
 
@@ -206,9 +266,8 @@ run;
 
 
 %let score = 670;
-
-%let CUR_var = CLTV Dti Cscore_b purpose Curr_rte HS GDP;
-%let DEL_var = Curr_rte CLTV Cscore_b QDT_UMP ;
+%let CUR_var = dti cscore_b orig_amt curr_rte upb loan_age  GDP HS HPI PPI ;
+%let DEL_var = dti FICO HS HPI PPI UMP GDP;
 
 /* Model 1 */
 
@@ -312,7 +371,8 @@ run;
 
 /* Regression Modelling */
 
-  
+%let score = 670;
+
 
 
 /* Regression of subprime group Delinquent */
@@ -327,19 +387,51 @@ run;
   %end;
 
 
+
+proc logistic data = PD_DATA.train_del_prm plots = all;
+class next_stat (ref = "DEL") / param=glm;
+model next_stat = &del_var / link = glogit rsquare;
+store del_prime;
+weight act_upb / normalize;
+lsmeans / e ilink cl ; 
+run;
+
+
+
+title "Probability for different states vs Note Rate";
+proc plm source=del_prime;
+ effectplot fit(x=cscore_b plotby=next_stat)  / ilink;
+run;
+footnote "Delinquent : Prime";
+title;
+
+
+proc plm restore=del_subprime;
+   effectplot contour(x= cscore_b y=Curr_rte plotby=next_stat);
+run; 
+
+
+/* Two continuous variables with classfication  */
+
+proc plm source = del_prime;
+ effectplot slicefit( x = Curr_rte sliceby = Cscore_b  plotby = next_stat) / ilink;
+run;
+/*  */
+
+
   proc logistic data = PD_DATA.train_del_sub ;
     class next_stat (ref = "&d_pd")  / param = glm;
     model next_stat = &DEL_var / link = glogit rsquare cl;
     weight act_upb / normalize;
-    lsmeans / e ilink cl;
+    lsmeans / e ilink cl ;
     code file = "&p_PDDATA./sub_tmp.sas";
   run;
-  
+
   
   
 /*  Test of prediction; */
   data sub_tmp;
-    set PD_DATA.test_&d_pd._sub;
+    set PD_DATA.train_del_sub;
     %include "&p_PDDATA./sub_tmp.sas";
   run;
    
@@ -370,6 +462,22 @@ run;
     keep next_stat predict;
   run;
   
+  
+  
+ ods output OneWayChiSq = sub_tmp_chi(keep = label1 cvalue1);
+ proc freq data = sub_tmp;
+    table next_stat / chisq
+    testp = (&sub);
+  run;
+  title;
+  footnote;
+  
+  data _null_;
+    set sub_tmp_chi;
+    call symputx('K'||left(_n_), label1);
+    call symputx('V'||left(_n_), cvalue1);
+  run;
+  
   %let sub = &CUR &DEL &PPY &SDQ;
   %put &sub;
   
@@ -382,14 +490,9 @@ run;
         on m.next_stat = f.next_stat
       order by f.next_stat
       ;
-  title "One Way Chi-Square Test of &d_pd Data";
-  footnote j = l "Group: SubPrime"; 
-   proc freq data = sub_tmp;
-    table next_stat / chisq
-    testp = (&sub);
-  run;
-  title;
-  footnote;
+ 
+  
+  
   
   
 
@@ -422,11 +525,13 @@ run;
     predict = predict*100;
   run;
   
-  title "Prediction of Test-Set";
+  title "Prediction of the Training Set";
   footnote j = l "Data: &d_pd Group: SubPrime";
   proc sgplot data = sub_qtr;
-    scatter x = yqtr y = historic / legendlabel = "Historical" ;
+    series x = yqtr y = historic / legendlabel = "Historical" ;
     series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predict";
+    inset ("&K1" = "&V1"
+           "&K3" = "&V3") / border opaque;
     xaxis label = "Year" grid;
     yaxis label = "Probability of &n_next (%)" grid;
   run;
@@ -435,20 +540,22 @@ run;
 
 
 
+
 /*   Regression for Prime group of Delinquent Dataset */
 
 
   proc logistic data = PD_DATA.train_del_prm;
     class next_stat (ref = "&d_pd") fico / param = glm;
-    model next_stat = &&&d_pd._var / link = glogit rsquare cl;
+    model next_stat = &DEL_var/ link = glogit rsquare cl;
     weight act_upb ;
     lsmeans / e ilink cl;
     code file = "&p_PDDATA./prm_tmp.sas";
   run;
 
+
 /*  Test of prediction */
   data prm_tmp;
-    set PD_DATA.test_&d_pd._prm ;
+    set PD_DATA.train_del_prm ;
     %include "&p_PDDATA/prm_tmp.sas";
   run;
   
@@ -475,8 +582,25 @@ run;
     call symputx (trim(next_stat), predict);
     keep next_stat predict;
   run;
+  
   %let prm = &CUR &DEL &PPY &SDQ;
   %put &prm;
+  
+ ods output OneWayChiSq = prm_tmp_chi(keep = label1 cvalue1);
+ proc freq data = prm_tmp;
+    table next_stat / chisq
+    testp = (&sub);
+  run;
+  title;
+  footnote;
+  
+  data _null_;
+    set prm_tmp_chi;
+    call symputx('K'||left(_n_), label1);
+    call symputx('V'||left(_n_), cvalue1);
+  run;
+  
+  
   proc sql;
     create table work.prm_tmp_r as
     select f.next_stat "Next State",
@@ -487,15 +611,7 @@ run;
       order by f.next_stat
       ;
   
-  title "One Way Chi-Square Test of &d_pd Data";
-  footnote j = l "Group: Prime";
-  proc freq data = prm_tmp;
-    table next_stat / chisq
-    testp = (&prm);
-  run;
-  title;
-  footnote;
-
+  
   
   ods output CrossTabFreqs = prm_qtr_f(where = (next_stat = "&next")
                                         keep = next_stat yqtr colpercent
@@ -523,11 +639,13 @@ run;
     predict = predict*100;
   run;
   
-  title "Prediction of Test-Set";
+  title "Prediction of the Training set";
   footnote j = l "Data: &d_pd Group: Prime";
   proc sgplot data = prm_qtr;
-    scatter x = yqtr y = historic / legendlabel = "Historical";
+    series x = yqtr y = historic / legendlabel = "Historical";
     series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predict";
+     inset ("&K1" = "&V1"
+           "&K3" = "&V3") / border opaque;
     xaxis label = "Year" grid;
     yaxis label = "Probability of &n_next (%)" grid;
   run;
@@ -587,8 +705,6 @@ run;
 
 
 
-
-
 /* Testing Dataset to Prime and Subprime  */
 
 %macro Testcur_FICO(d_pd);
@@ -632,24 +748,57 @@ run;
   
 %mend fittest;
 
+%let score = 670;
+
+%let CUR_var = dti cscore_b orig_amt curr_rte upb loan_age GDP HS HPI PPI ;
+
 
 /* Regression CURRENT Dataset for SUBPRIME Group */
 
 %let d_pd = CUR;
 
-  proc logistic data = PD_DATA.train_cur_sub ;
-    class next_stat (ref = "&d_pd") Purpose  / param = glm;
+  proc logistic data = PD_DATA.train_cur_sub  ;
+    class next_stat (ref = "&d_pd") / param = glm;
     model next_stat = &CUR_var / link = glogit rsquare cl;
     weight act_upb / normalize;
+    store cur_subprime;
     lsmeans / e ilink cl;
     code file = "&p_PDDATA./sub_cur_tmp.sas";
   run;
+  
+/*   proc plm restore= cur_subprime; */
+/* effectplot slicefit ( x = HS  sliceby = Purpose ) / clm ilink; */
+/* run; */
+/*  */
+/* proc means data = PD_DATA.train_cur_sub; */
+/* run; */
+/*  */
+/* title "Probability for different states vs Note Rate"; */
+/* proc plm source=cur_subprime; */
+/*  effectplot fit(x=dti  plotby=next_stat)  / ilink; */
+/* run; */
+/* title; */
+/*  */
+/*  */
+/*   */
+/*   */
+/* proc plm restore=cur_subprime; */
+/*    effectplot slicefit(x= CLTV sliceby = purpose  plotby=next_stat); */
+/* run;  */
+/*  */
+/*  */
+/* Two continuous variables with classfication  */
+/*  */
+/* title "Probability for different states vs Note Rate"; */
+/* proc plm source = cur_subprime; */
+/*  effectplot slicefit( x = GDP sliceby = cscore_b  plotby = next_stat) / ilink; */
+/* run; */
 
 
 
 * Test of prediction;
   data subcur_tmp;
-    set PD_DATA.test_&d_pd._sub;
+    set PD_DATA.train_cur_sub;
     %include "&p_PDDATA./sub_cur_tmp.sas";
   run;
   
@@ -668,6 +817,8 @@ run;
                             rename = (_name_ = p_next_stat col1 = predict)
                               );
   run;
+  
+  
   data subcur_tmp_m;
     set subcur_tmp_m;
     _idx = find(p_next_stat, "_mean", "i");
@@ -679,24 +830,22 @@ run;
   
   %let subcur = &CUR &DEL &PPY &SDQ;
   %put &subcur;
-  proc sql;
-    create table work.subcur_tmp_r as
-    select f.next_stat "Next State",
-           percent "Actual Probability (%)",
-           predict "Predicted Probability (%)"
-      from work.subcur_tmp_m as m inner join work.subcur_tmp_f as f
-        on m.next_stat = f.next_stat
-      order by f.next_stat
-      ;
-  quit;
-  title "One Way Chi-Square Test of &d_pd Data";
-  footnote j = l "Group: Sub-Prime";
+  
+  
+  ods output OneWayChiSq = subcur_tmp_chi(keep = label1 cvalue1);
   proc freq data = subcur_tmp;
     table next_stat / chisq
     testp = (&subcur);
   run;
-  title;
-  footnote;
+  
+  data _null_;
+    set subcur_tmp_chi;
+    call symputx('K'||left(_n_), label1);
+    call symputx('V'||left(_n_), cvalue1);
+  run;
+  
+
+
   
   ods output CrossTabFreqs = subcur_qtr_f(where = (next_stat = "&next")
                                         keep = next_stat yqtr colpercent
@@ -724,12 +873,26 @@ run;
     predict = predict*100;
   run;
   
+    proc sql;
+    create table work.subcur_tmp_r as
+    select f.next_stat "Next State",
+           percent "Actual Probability (%)",
+           predict "Predicted Probability (%)"
+      from work.subcur_tmp_m as m inner join work.subcur_tmp_f as f
+        on m.next_stat = f.next_stat
+      order by f.next_stat
+      ;
+  quit;
 
-  title "Prediction of Test-Set";
+  
+
+  title "Prediction of the Training Set";
   footnote j = l "Data: &d_pd Group: Sub-Prime";
   proc sgplot data = subcur_qtr;
-    scatter x = yqtr y = historic / legendlabel = "Historical";
+    series x = yqtr y = historic / legendlabel = "Historical";
     series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predict";
+      inset ("&K1" = "&V1"
+           "&K3" = "&V3") / border opaque;
     xaxis label = "Year" grid;
     yaxis label = "Probability of &n_next (%)" grid;
   run;
@@ -751,16 +914,32 @@ run;
     %let n_next = Default;
   %end;
 
-  proc logistic data = PD_DATA.train_cur_prm ;
-    class next_stat (ref = "&d_pd") Purpose  / param = glm;
-    model next_stat = &CUR_var / link = glogit rsquare cl;
-    weight act_upb / normalize;
+  proc logistic data = PD_DATA.train_cur_prm plots = all;
+    class next_stat (ref = "&d_pd") / param = glm;
+    model next_stat = &CUR_var / link = glogit rsquare cl influence iplots ;
+    weight act_upb / normalize ;
     lsmeans / e ilink cl;
+    store cur_prime;
     code file = "&p_PDDATA./prm_cur_tmp.sas";
   run;
 
+
+
+
+
+proc plm source = cur_prime;
+show effects;
+effectplot fit(x=dti  plotby=next_stat)  / ilink;
+run;
+
+/*  effectplot INTERACTION(x=Boy sliceby=MomAge=-10 -5 0 5 10 15 plotby=CigsPerDay); */
+proc plm restore= cur_prime;
+effectplot slicefit ( x = HS  sliceby = Purpose ) / clm ilink;
+run;
+
+
   data prmcur_tmp;
-    set PD_DATA.test_&d_pd._prm;
+    set PD_DATA.train_cur_prm;
     %include "&p_PDDATA./prm_cur_tmp.sas";
   run;
   
@@ -791,25 +970,23 @@ run;
   
   %let prmcur = &CUR &DEL &PPY &SDQ;
   %put &prmcur;
-  proc sql;
-    create table work.prmcur_tmp_r as
-    select f.next_stat "Next State",
-           percent "Actual Probability (%)",
-           predict "Predicted Probability (%)"
-      from work.prmcur_tmp_m as m inner join work.prmcur_tmp_f as f
-        on m.next_stat = f.next_stat
-      order by f.next_stat
-      ;
-  quit;
-  title "One Way Chi-Square Test of &d_pd Data";
-  footnote j = l "Group: Sub-Prime";
+  
+  
+  
+  
+  
+  ods output OneWayChiSq = prmcur_tmp_chi(keep = label1 cvalue1);
   proc freq data = prmcur_tmp;
     table next_stat / chisq
     testp = (&prmcur);
   run;
-  title;
-  footnote;
- 
+  
+  data _null_;
+    set prmcur_tmp_chi;
+    call symputx('K'||left(_n_), label1);
+    call symputx('V'||left(_n_), cvalue1);
+  run;
+  
   
   ods output CrossTabFreqs = prmcur_qtr_f(where = (next_stat = "&next")
                                         keep = next_stat yqtr colpercent
@@ -839,12 +1016,27 @@ run;
     predict = predict*100;
   run;
   
+  
+  proc sql;
+    create table work.prmcur_tmp_r as
+    select f.next_stat "Next State",
+           percent "Actual Probability (%)",
+           predict "Predicted Probability (%)"
+      from work.prmcur_tmp_m as m inner join work.prmcur_tmp_f as f
+        on m.next_stat = f.next_stat
+      order by f.next_stat
+      ;
+  quit;
+  
 
-  title "Prediction of Test-Set";
+
+  title "Prediction of the Training Set";
   footnote j = l "Data: &d_pd Group: Prime";
   proc sgplot data = prmcur_qtr;
-    scatter x = yqtr y = historic / legendlabel = "Historical";
+    series x = yqtr y = historic / legendlabel = "Historical";
     series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predict";
+    inset ("&K1" = "&V1"
+           "&K3" = "&V3") / border opaque;
     xaxis label = "Year" grid;
     yaxis label = "Probability of &n_next (%)" grid;
   run;

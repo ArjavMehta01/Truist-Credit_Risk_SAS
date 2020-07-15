@@ -4,7 +4,7 @@
 %let n_c1 = Sub_Prime;
 %let n_c2 = Prime;
 
-%let c_var = Purpose;
+%let c_var = ;
 
 
 %let CUR_macro = HS GDP;
@@ -215,16 +215,26 @@
 %mend test;
 
 %test(1);
+
 %test(2);
 
 
-/*  */
-/* %macro predict(d_pd); */
-/* ods powerpoint exclude all; */
-/*  */
-/*  */
-/*   */
-/*  */
+%let d_pd = DEL;
+ %if "&d_pd" = "CUR" %then %do;
+    %let next = DEL;
+    %let n_next = Delinquent;
+  %end;
+  %if "&d_pd" = "DEL" %then %do;
+    %let next = SDQ;
+    %let n_next = Default;
+  %end;
+
+%macro predict(d_pd);
+ods powerpoint exclude all;
+
+
+ 
+
 /* * Split training dataset into two classes; */
 /*   data c1_&d_pd c2_&d_pd p_&d_pd; */
 /*     set PD_DATA.train_&d_pd; */
@@ -240,10 +250,10 @@
 /*      */
 /*     keep &&&d_pd._var &c_var act_upb next_stat yqtr &seg; */
 /*   run; */
-/*    */
-/*    */
-/*    */
-/* * Split testing dataset into two classes; */
+  
+  
+  
+* Split testing dataset into two classes;
 /*   data p_c1_&d_pd p_c2_&d_pd; */
 /*     set PD_DATA.out_&d_pd; */
 /*     where orig_dte < "30Mar2016"d; */
@@ -254,18 +264,18 @@
 /*     keep &&&d_pd._var &c_var act_upb next_stat yqtr; */
 /*      */
 /*   run; */
-/*    */
-/*   %test(1); */
-/*   %test(2); */
-/*    */
-/*    */
+  
+  %test(1);
+  %test(2);
+  
+  
 /*   data PD_DATA.p_&d_pd; */
 /*     length group $20; */
 /*     set p_c1_&d_pd(in = c1) p_c2_&d_pd(in = c2); */
 /*     if c1 then group = "&n_c1"; */
 /*     if c2 then group = "&n_c2"; */
 /*   run; */
-/* %mend predict; */
+%mend predict;
 
 /* options nodate; */
 /* ods powerpoint file = "&p_report/model1.ppt" */
@@ -276,9 +286,9 @@
 
 /* %predict(DEL); */
 /* %predict(CUR); */
-/*  */
-/* ods html close; */
-/* ods powerpoint close; */
+
+ods html close;
+ods powerpoint close;
 
 
 %macro out_matrix(num);
@@ -318,7 +328,4 @@
 %out_matrix(2);
 
 
-proc export data = PD_DATA.prime outfile = "&p_pddata/prime.csv" dbms = csv;
-run;
-proc export data = PD_DATA.sub_prime outfile = "&p_pddata/sub.csv" dbms = csv;
-run;
+proc export data = PD_DATA.
