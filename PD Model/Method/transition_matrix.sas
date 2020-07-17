@@ -1,6 +1,27 @@
 /* Author: Zheng */
 /* Purpose: Generate the marginal PD from transition matrix */
 
+
+
+/* Import the transition matrix from google drive */
+
+%let id = %nrstr(1UgvbJFh5N-UQ0aa4KYZM4biUX6WApGSA);
+%let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id;
+
+filename _tmp "%sysfunc(getoption(work))/prime.sas7bdat";
+proc http method="get" 
+ url="&_url" 
+ out=_tmp;
+run;
+filename _tmp clear;
+
+title "Transition Matrix of Prime Group(obs = 12)";
+proc print data = example(obs = 12);
+run;
+
+
+/* Macro function for generating the marginal PD */
+
 %macro transition_matrix(input, output,                   /* input and output dataset */
                          date = yqtr,                     /* name of date variable */
                          initial = CUR,                   /* initial state: set up to 100% */
@@ -90,9 +111,9 @@
     end;
     Prob = Prob`;
     N = &date || N || cum_pd`;
-    create &output from N[c = {"Date" "&L_var" "Conditional"}];
+    create &output._con from N[c = {"Date" "&L_var" "Conditional"}];
       append from N;
-    close &output;
+    close &output._con;
     
     create plot_pd from Prob[c = {"Prob"}];
       append from Prob;
@@ -100,11 +121,11 @@
   quit;
 
 * Generate the output dataset;
-  data &output;
-    set &output;
+  data &output._con;
+    set &output._con;
     format date &f_date..;
   run;
-  data &output._plot;
+  data &output;
     set plot(firstobs = 2);
     set plot_pd;
     format prob percent10.4;
@@ -114,7 +135,7 @@
   %if &plot %then %do;
     title "Predicted probability of &response";
     footnote j = l "Data: &input";
-    proc sgplot data = &output._plot;
+    proc sgplot data = &output;
       series x = &date y = prob;
       xaxis label = "Time" grid;
       yaxis label = "Propability of &response (%)" grid;
@@ -125,10 +146,13 @@
 %mend transition_matrix;
 
 
-%transition_matrix(PD_DATA.prime, prime_sdq);
-%transition_matrix(PD_DATA.prime, prime_ppy, response = PPY);
-%transition_matrix(PD_DATA.sub_prime, sub_prime_sdq);
-%transition_matrix(PD_DATA.sub_prime, sub_prime_ppy, response = PPY);
+/* Call the macro function on prime dataset */
 
+%transition_matrix(prime, prime_pd);
+
+title "Marginal PD";
+proc print data = prime_pd;
+run;
+title;
 
 quit;

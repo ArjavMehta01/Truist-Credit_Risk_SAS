@@ -10,13 +10,17 @@ options nodate;
 %let n_c1 = Sub_Prime;
 %let n_c2 = Prime;
 
+proc freq data = DATA.loan;
+  tables mod_ind;
+run;
 
 
 %let CUR_var = OLTV cscore_b orig_amt loan_age;
 %let DEL_var = OLTV cscore_b;
+/* %let DEL_var = dti cscore_b hs ppi hpi ump gdp; */
 
 %macro test(num);
-  ods powerpoint exclude all;
+  ods powerpoint exclude none;
 * Multinomial Logistic Regression;
   proc logistic data = c&num._&d_pd;
     class next_stat (ref = "&d_pd") / param = glm;
@@ -25,7 +29,7 @@ options nodate;
     lsmeans / e ilink cl;
     code file = "%sysfunc(getoption(work))/&num._tmp.sas";
   run;
-  
+  ods powerpoint exclude all;
 * Prediction for the test;
   data c&num._tmp;
     set p_c&num._&d_pd;
@@ -130,7 +134,7 @@ options nodate;
   proc sgplot data = c&num._plot;
     series x = yqtr y = historic / legendlabel = "Historical";
     series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predict";
-    inset ("&K1" = "&V1"
+    *inset ("&K1" = "&V1"
            "&K3" = "&V3") / border opaque;
     xaxis label = "Year" grid;
     yaxis label = "Probability of &n_next (%)" grid;
@@ -164,6 +168,8 @@ ods powerpoint exclude all;
     if &score <= &seg then output c2_&d_pd;
     output p_&d_pd;
     
+    GDP = (GDP - lag(GDP))/lag(GDP);
+    
     keep &&&d_pd._var act_upb next_stat yqtr;
   run;
   
@@ -175,22 +181,22 @@ ods powerpoint exclude all;
     ;
     if 0 < &seg < &score then output p_c1_&d_pd;
     if &score <= &seg then output p_c2_&d_pd;
-    
+   
     keep &&&d_pd._var act_upb next_stat yqtr;
     
   run;
   
-  %test(1);
+/*   %test(1); */
   %test(2);
   
 
 %mend predict;
 
 options nodate;
-ods powerpoint file = "&p_report/model_base.ppt"
+ods powerpoint file = "&p_report/model_1.ppt"
                style = Sapphire;
 
-%predict(DEL);
+/* %predict(DEL); */
 %predict(CUR);
 
 ods powerpoint close;
