@@ -266,8 +266,8 @@ run;
 
 
 %let score = 670;
-%let CUR_var = dti cscore_b orig_amt curr_rte upb loan_age  GDP HS HPI PPI ;
-%let DEL_var = dti FICO HS HPI PPI UMP GDP;
+%let CUR_var =   CLTV dti cscore_b purpose curr_rte HS HPI PPI UMP GDP  ;
+%let DEL_var = cltv dti cscore_b HS HPI PPI UMP GDP QDT_UMP;
 
 /* Model 1 */
 

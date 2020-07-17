@@ -4,12 +4,12 @@
 
 
 
-%let id02 = %nrstr(1fP2Ggzb-Ry20sgsQXJ3tkz9G1UPSDJbZ);
+%let id02 = %nrstr(1SAM-jrybVOBECHwkcaJMgN8V8uJCsqw-);
 %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id02;
 filename url_file url "&_url";
 
  
-  data Unemployment ( keep = QDT_UMP Unemp_Var yqtr QGT_UMP AG_UMP);
+  data Unemployment ( keep = yqtr lagging_UMP QDT_UMP QGT_UMP AG_UMP);
   	infile url_file missover dsd firstobs= 2;
   	input chardate:$10. Unemp_Var;
   	date = input(chardate,yymmdd10.);
@@ -24,36 +24,37 @@ filename url_file url "&_url";
   	AG_UMP = "Annual Growth in Percent"
   	;
   	format yqtr yyq. logP_UMP QGT_UMP AGT_UMP QRT_UMP ART_UMP QDT_UMP comma10.5 pctchng_UMP AG_UMP percentN10.2 date ddmmyy10. ;
+  	lagging_UMP = lag ( dif (Unemp_var) ) ;
   	lagvar1 = lag(Unemp_Var) ;
   	lagvar4 = lag4(Unemp_Var);
   	logP_UMP = log(Unemp_Var); /*Log transformation*/
   	QGT_UMP = log ( Unemp_Var / lagvar1 ); /*Quarterly Growth Transformation ( ln(Xt / Xt-1) )*/ 
-  	AGT_UMP = log ( Unemp_Var / lagvar4 ); /*Annual Growth Transformation ( ln(Xt / Xt-12) ) */
+  	AGT_UMP = log ( Unemp_Var / lagvar4 ); /*Annual Growth Transformation ( ln(Xt / Xt-4) ) */
   	QRT_UMP = ( Unemp_Var / lagvar1 ) ;/* Quarterly Return Transformation ( Xt / Xt-1 ) */
-  	ART_UMP = ( Unemp_Var / lagvar12 ) ;/* Annual Return Transformation (Xt / Xt-12 ) */
+  	ART_UMP = ( Unemp_Var / lagvar4 ) ;/* Annual Return Transformation (Xt / Xt-4 ) */
   	QDT_UMP = dif(Unemp_Var); /* Quarterly Difference Transformation ( Xt - Xt-1 ) */	
-  	pctchng_UMP = ( ( Unemp_Var / lag( Unemp_Var ) ) ** 12 - 1 ) * 100;
-  	AG_UMP = dif4( Unemp_Var ) / lag4( Unemp_Var ) * 100; /*computed percent change from the same period in the previous year*/
+  	pctchng_UMP = ( ( Unemp_Var / lag( Unemp_Var ) ) ** 4 - 1 ) ;
+  	AG_UMP = dif4( Unemp_Var ) / lag4( Unemp_Var ) ; /*computed percent change from the same period in the previous year*/
   	yqtr = yyq(year(date),qtr(date));
   run;
   
 
+/* 1Pyf8AO44zzDxDUfSWdwi4Bi4wUNhybgb */
 
 
-
-  %let id03 = %nrstr(1Pyf8AO44zzDxDUfSWdwi4Bi4wUNhybgb);
+  %let id03 = %nrstr(1AC_Mweg4cpiFieyFqKCmUdxCvJERJtLh);
   %let _url = %nrstr(https://docs.google.com/uc?export=download&id=)&&id03;
   filename url_file url "&_url";
   
-  data GDP (keep = yqtr ggr GDP_Var QGT_GDP QRT_GDP AG_GDP );
+  data GDP (keep = yqtr GDP_Annual_Rate QRT_GDP Ggr QDT_GDP AG_GDP QGT_GDP );
   	infile url_file missover dsd firstobs = 2;
   	input chardate:$10. GDP_Var;
   	
   	date = input( chardate , yymmdd10.);
   	
   	;
-  	format yqtr yyq.  QGT_GDP QRT_GDP  QDT_GDP comma10.5 AG_GDP percent10.2 date mmddyy10.;
-  	
+  	format yqtr yyq.  QGT_GDP QRT_GDP  QDT_GDP comma10.5 AG_GDP GDP_Annual_Rate percentn10.2 date mmddyy10.;
+  	lagvar1 = lag(GDP_Var);
   	Ggr = (gdp_var - lag(GDP_var) ) / gdp_var;
   	
   	QGT_GDP = log ( GDP_Var / lag(GDP_Var) ); /*Quarterly Growth Transformation ( ln(Xt / Xt-1) ) */
@@ -62,9 +63,17 @@ filename url_file url "&_url";
 
   	QDT_GDP = dif(lag(GDP_Var)); /* Quarterly Difference Transformation ( Xt - Xt-1 ) */	
   
-  	AG_GDP = dif4( GDP_Var ) / lag4( GDP_Var ) * 100; /*computed percent change from the same period in the previous year*/
-
-   	yqtr = yyq(year(date),qtr(date));
+  	AG_GDP = dif4( GDP_Var ) / lag4( GDP_Var ); /*computed percent change from the same period in the previous year*/
+	
+	g = ( GDP_Var - lagvar1 ) / lag(GDP_Var)  ;
+	s = 1+g;
+	pow = 4;
+	y = s**pow;
+	
+	GDP_Annual_Rate =  y- 1 ;
+	
+   
+   yqtr = yyq(year(date),qtr(date));
    	
  run;
   
@@ -128,10 +137,11 @@ proc sort data = PD_DATA.test_del;
 by yqtr;
 run;
 
-/* Merging Unemployment to Training and Testing Data sets */
+/* Merging Unemployment and GDP to Training and Testing Data sets */
 data temp_train_cur;
 merge PD_DATA.train_cur Unemployment GDP;
 by yqtr;
+if ^missing (Loan_id);
 run; 
 
 /* proc sort data = temp_train_cur; */
@@ -146,16 +156,19 @@ run;
 data temp_train_del;
 merge PD_DATA.train_del Unemployment GDP ;
 by yqtr;
+if ^missing (Loan_id);
 run; 
 
 data temp_test_cur;
 merge PD_DATA.test_cur Unemployment GDP ;
 by yqtr;
+if ^missing (Loan_id);
 run; 
 
 data temp_test_del;
 merge PD_DATA.test_del Unemployment GDP;
 by yqtr;
+if ^missing (Loan_id);
 run; 
 
 
@@ -187,28 +200,28 @@ run;
 /* Adding CLTV in the datasets and merging them with MacroEconomics */
 
 data  PD_DATA.train_Final_cur ;
-merge temp_train_cur macros  ( rename = (date = orig_dte hpi = orig_hpi)) ;
+merge temp_train_cur macros  ( rename = (date = orig_dte hpi = orig_hpi) drop = yqtr) ;
 by orig_dte;
 CLTV = oltv*(orig_hpi/hpi)*(act_upb/orig_amt);
 run;
 
 
 data  PD_DATA.train_Final_del ;
-merge temp_train_del macros  ( rename = (date = orig_dte hpi = orig_hpi)) ;
+merge temp_train_del macros( rename = (date = orig_dte hpi = orig_hpi) drop = yqtr) ;
 by orig_dte;
 CLTV = oltv*(orig_hpi/hpi)*(act_upb/orig_amt);
 run;
 
 
 data  PD_DATA.test_Final_cur ;
-merge temp_test_cur macros  ( rename = (date = orig_dte hpi = orig_hpi)) ;
+merge temp_test_cur macros  ( rename = (date = orig_dte hpi = orig_hpi) drop = yqtr) ;
 by orig_dte;
 CLTV = oltv*(orig_hpi/hpi)*(act_upb/orig_amt);
 run;
 
 
 data  PD_DATA.test_Final_del ;
-merge temp_test_del macros  ( rename = (date = orig_dte hpi = orig_hpi)) ;
+merge temp_test_del macros  ( rename = (date = orig_dte hpi = orig_hpi) drop = yqtr) ;
 by orig_dte;
 CLTV = oltv*(orig_hpi/hpi)*(act_upb/orig_amt);
 run;
@@ -299,13 +312,15 @@ run;
 %let n_c1 = Sub_Prime;
 %let n_c2 = Prime;
 
+/* proc glmselect data = PD_DATA.train_cur_sub; */
+/* run; */
+%let Macros = HS PPI Permits UMP   ;
 
+%let MacroTransf = QGT_GDP QRT_GDP AG_GDP QDT_UMP QGT_UMP AG_UMP ggr lagging_UMP GDP_Annual_Rate ;
 
-%let macros = HS PPI Permits GDP QGT_GDP QRT_GDP AG_GDP QDT_UMP QGT_UMP AG_UMP ggr;
+%let CUR_var = CLTV dti cscore_b orig_amt purpose curr_rte loan_age Orig_chn Orig_rt Orig_trm Num_bo &Macros &MacroTransf;
 
-%let CUR_var = CLTV dti cscore_b orig_amt purpose curr_rte act_upb loan_age   act_upb &macros ;
-
-%let DEL_var = CLTV dti cscore_b HS PPI act_upb &macros;
+%let DEL_var = CLTV dti cscore_b Orig_chn Orig_rt Orig_trm Num_bo curr_rte &Macros &MacroTransf;
 
 %macro Split_Data(d_pd);
   %if "&d_pd" = "CUR" %then %do;
@@ -324,9 +339,9 @@ run;
     if 0 < &seg < &score then output c1_&d_pd;
     if &score <= &seg then output c2_&d_pd;
     if ^missing(&seg);
-    
+
     keep &&&d_pd._var next_stat yqtr act_upb;
-    
+
   run;
   
 * Split testing dataset into two classes;
@@ -338,11 +353,11 @@ run;
     if 0 < &seg < &score then output c1_test_&d_pd;
     if &score <= &seg then output c2_test_&d_pd ;
     if ^missing(&seg);
-    keep &&&d_pd._var next_stat yqtr act_upb ;
+    keep &&&d_pd._var next_stat yqtr act_upb  ;
     
   run;
 
-%mend Split_Data();
+%mend Split_Data;
 
 %Split_Data(DEL);
 %Split_Data(CUR);
@@ -355,16 +370,30 @@ run;
 %let n_c2 = Prime;
 %let c_var = ;
 
-%let macros = HS PPI GDP QGT_GDP QRT_GDP AG_GDP  QDT_UMP QGT_UMP AG_UMP ggr;
 
-%let CUR_var = CLTV dti cscore_b orig_amt purpose curr_rte loan_age  &macros ;
+%let Macros = HS ;
 
-%let DEL_var = CLTV dti cscore_b  &macros;
+%let MacroTransf = QDT_UMP GDP_Annual_Rate ;
 
+%let CUR_var = CLTV dti cscore_b orig_amt loan_age  Purpose Orig_chn Orig_rt Orig_trm &MacroTransf;
+
+%let DEL_var = CLTV Orig_rt HS QGT_GDP QDT_UMP;
+
+proc corr data = c&num._&d_pd pearson plots(Maxpoints = None ) = Matrix(Histogram);
+var &Cur_var;
+run;
+
+
+/* Orig_chn */
+
+/*  Delinquent subprime Data*/
+/* %let Macro_Del_Var  = GDP_Annual_Rate QGT_GDP lagging_UMP*/
+/*  */
+/* %let Del_Var = Orig_rt Num_bo CLTV Dti*/
 
 %let d_pd = CUR;
-%let num = 1;
-%let c_var = Purpose;
+%let num = 2;
+
 %macro test(num);
 
  %if "&d_pd" = "CUR" %then %do;
@@ -374,6 +403,7 @@ run;
   %if "&d_pd" = "DEL" %then %do;
     %let next = SDQ;
     %let n_next = Default;
+    %let c_var = ;
   %end;
 
 
@@ -382,12 +412,23 @@ run;
   ods output ParameterEstimates = &d_pd._c&num._pa(keep = variable response classval0 estimate probchisq);
   proc logistic data = c&num._&d_pd;
     class next_stat (ref = "&d_pd") &c_var / param = glm;
-    model next_stat = &&&d_pd._var &c_var/ link = glogit rsquare cl selection = B;
+    model next_stat = &&&d_pd._var &c_var/ link = glogit  rsquare cl lackfit;
     weight act_upb / normalize;
     lsmeans / e ilink cl;
+    store c&num._&d_pd._File;
     code file = "%sysfunc(getoption(work))/&num._tmp.sas";
   run;
   
+  
+proc plm source = c&num._&d_pd._File;
+ effectplot slicefit( x = Orig_rt  plotby = Orig_chn) / ilink;
+run;
+  
+  
+  proc plm source = c&num._&d_pd._File;
+   effectplot fit( x = ) ;
+  run;
+
   ods html exclude none;
   title "Parameter Estimates";
   title2 j = l "Data: &d_pd. Group: &&&n_c&num";
@@ -443,6 +484,7 @@ run;
   footnote;
   ods html exclude all;
   
+/*  c&num._&d_pd */
 * Prediction for the test;
   data c&num._tmp;
     set c&num._&d_pd;
@@ -523,10 +565,10 @@ run;
   run;
   proc sort data = c&num._tmp;
     by yqtr;
-  run;
+  run;  
   ods output Summary = c&num._plot2(keep = yqtr P_next_stat&next._Mean
   											rename = (P_next_stat&next._Mean = predict));
-  proc means data = c&num._tmp mean;
+  proc means data = c&num._tmp(where = (act_upb ^= . )) mean ;
     var p_:;
     by yqtr;
     weight act_upb;
@@ -577,18 +619,27 @@ run;
   
 %mend test;
 
-%let d_pd = DEL;
+%let d_pd = DEL; 
 %let c_var = ;
 %test(1);
 %test(2);
 
 
+
 options nodate;
 ods powerpoint file = "&p_report/model1.ppt"
                style = Sapphire;
+ ods powerpoint exclude all;              
+               
 ods html file = "&p_report/model1.html"
         style = Sapphire;
+        
+        
 ods html exclude all;
+
+proc options option=config;
+run;
+
 
 ods powerpoint close;
 ods html close;
