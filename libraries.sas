@@ -1,4 +1,4 @@
-/* Author: Group B */
+/* Author: Zheng */
 /* Purpose: library file for local path */
 
   

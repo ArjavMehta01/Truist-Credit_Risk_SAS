@@ -54,7 +54,7 @@ run;
 /*   run; */
 
   data chisq_test(keep = loan_id cscore_b next_stat)
-       PD_DATA.train(keep = loan_id &train_var SDQ PPY yqtr);
+       PD_DATA.train(keep = loan_id &train_var SDQ PPY yqtr orig_dte &class_var next_stat);
     set &datasets;
     label gdp_annual_rate = "GDP: Annual Growth"
           QDT_ump = "Unemployment Rate: Quarterly Difference";
@@ -277,3 +277,15 @@ run;
 %outres();
 
 quit;
+
+*ods trace on;
+ods output CrossTabFreqs = _tmp;
+proc freq data = PD_DATA.train_cur (where = ((cscore_b le 670) and (^missing(act_upb))));
+  table next_stat * orig_chn;
+run;
+proc sgplot data = _tmp(where = (next_stat = "PPY"));
+  vbar colPercent / response = colPercent group = orig_chn stat = sum;
+  yaxis label = "P of Prepayment";
+  xaxis label = "test";
+run;
+
