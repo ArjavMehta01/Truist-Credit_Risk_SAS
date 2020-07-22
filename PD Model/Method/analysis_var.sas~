@@ -16,6 +16,9 @@
 %let train_var = orig_rt orig_amt cscore_b cltv dti orig_trm loan_age 
                  orig_chn curr_rte purpose &macro;
 
+proc freq data = PD_DATA.train_cur;
+  table next_stat;
+run;
 
 proc format;
   value c_&c_var low -< 350 = '[0-350)'
