@@ -300,20 +300,78 @@ run;
 
 
 
+data PD_DATA.train_Final_cur( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI Payroll_mean = Payrolls));
+merge PD_DATA.train_Final_cur test;
+label 
+HS_mean = 'Housing Starts'
+PPI_mean = 'Producer Price Index'
+Permits_mean = 'Housing Permits'
+HPI_mean = 'Housing Price Index'
+Payroll_mean = 'Payrolls'
+;
+format HS_mean PPI_mean Permits_mean HPI_mean Payroll_mean comma10.2;
+by yqtr;
+run;
 
+
+data PD_DATA.train_final_del( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI Payroll_mean = Payrolls ));
+merge PD_DATA.train_Final_del test;
+label 
+HS_mean = 'Housing Starts'
+PPI_mean = 'Producer Price Index'
+Permits_mean = 'Housing Permits'
+HPI_mean = 'Housing Price Index'
+Payroll_mean = 'Payrolls'
+;
+format HS_mean PPI_mean Permits_mean HPI_mean Payroll_mean comma10.2;
+by yqtr;
+run;
+
+
+data PD_DATA.test_final_cur( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI Payroll_mean = Payrolls  ));
+merge PD_DATA.test_final_cur test;
+label 
+HS_mean = 'Housing Starts'
+PPI_mean = 'Producer Price Index'
+Permits_mean = 'Housing Permits'
+HPI_mean = 'Housing Price Index'
+Payroll_mean = 'Payrolls'
+;
+format HS_mean PPI_mean Permits_mean HPI_mean Payroll_mean comma10.2;
+by yqtr;
+run;
+
+
+
+
+data PD_DATA.test_final_del( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI Payroll_mean = Payrolls));
+merge PD_DATA.test_Final_del test;
+label 
+HS_mean = 'Housing Starts'
+PPI_mean = 'Producer Price Index'
+Permits_mean = 'Housing Permits'
+HPI_mean = 'Housing Price Index'
+Payroll_mean = 'Payrolls'
+;
+format HS_mean PPI_mean Permits_mean HPI_mean Payroll_mean comma10.2;
+by yqtr;
+run;
+
+
+
+/* Running Binomial Logistic Regression on Diff_Mortgage */
 
 
 data xyz;
 set PD_DATA.test_final_cur;
 if next_stat = 'PPY' then flag = 1;
 else flag = 0; 
-
 run;
-
 
 proc logistic data = xyz (where = (cscore_b > 670 )) plots(Maxpoints = NONE ) = all;
 class flag (ref = '0');
-model flag = diff_Mortgage;
+model flag = diff_Mortgage / link = glogit;
+weight act_upb /normalize;
 run;
 
 proc boxplot data = xyz;
@@ -330,64 +388,6 @@ ods graphics off;
 ods output CrossTabFreqs = _tmp;
 proc freq data = PD_DATA.train_final_cur (where = ((cscore_b le 670) and (^missing(act_upb))));
   table next_stat * Purpose;
-run;
-
-
-data PD_DATA.train_Final_cur( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI ));
-merge PD_DATA.train_Final_cur test;
-label 
-HS_mean = 'Housing Starts'
-PPI_mean = 'Producer Price Index'
-Permits_mean = 'Housing Permits'
-HPI_mean = 'Housing Price Index'
-Payroll_mean = 'Payrolls'
-;
-format HS_mean PPI_mean Permits_mean HPI_mean Payroll_mean comma10.2;
-by yqtr;
-run;
-
-
-data PD_DATA.train_final_del( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI  ));
-merge PD_DATA.train_Final_del test;
-label 
-HS_mean = 'Housing Starts'
-PPI_mean = 'Producer Price Index'
-Permits_mean = 'Housing Permits'
-HPI_mean = 'Housing Price Index'
-Payroll_mean = 'Payrolls'
-;
-format HS_mean PPI_mean Permits_mean HPI_mean Payroll_mean comma10.2;
-by yqtr;
-run;
-
-
-data PD_DATA.test_final_cur( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI  ));
-merge PD_DATA.test_final_cur test;
-label 
-HS_mean = 'Housing Starts'
-PPI_mean = 'Producer Price Index'
-Permits_mean = 'Housing Permits'
-HPI_mean = 'Housing Price Index'
-Payroll_mean = 'Payrolls'
-;
-format HS_mean PPI_mean Permits_mean HPI_mean Payroll_mean comma10.2;
-by yqtr;
-run;
-
-
-
-
-data PD_DATA.test_final_del( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI ));
-merge PD_DATA.test_Final_del test;
-label 
-HS_mean = 'Housing Starts'
-PPI_mean = 'Producer Price Index'
-Permits_mean = 'Housing Permits'
-HPI_mean = 'Housing Price Index'
-Payroll_mean = 'Payrolls'
-;
-format HS_mean PPI_mean Permits_mean HPI_mean Payroll_mean comma10.2;
-by yqtr;
 run;
 
 
