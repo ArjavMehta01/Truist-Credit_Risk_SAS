@@ -4,8 +4,8 @@
 
 %let datasets = PD_DATA.train_cur PD_DATA.train_del;
 
-%let outfile = week10.ppt;
-%let extension = powerpoint;
+%let outfile = test_dti.html;
+%let extension = html5;
 
 %let macro = QDT_ump gdp_annual_rate HS;
 
@@ -15,7 +15,6 @@
 
 %let train_var = orig_rt orig_amt cscore_b cltv dti orig_trm loan_age 
                  orig_chn curr_rte purpose &macro;
-
 
 proc format;
   value c_&c_var low -< 350 = '[0-350)'
@@ -53,7 +52,7 @@ run;
 /*     &c_var = put(&v_var, c_&c_var..); */
 /*   run; */
 
-  data chisq_test(keep = loan_id cscore_b next_stat)
+  data test_missing(keep = loan_id &train_var next_stat)
        PD_DATA.train(keep = loan_id &train_var SDQ PPY yqtr orig_dte &class_var next_stat);
     set &datasets;
     label gdp_annual_rate = "GDP: Annual Growth"
@@ -85,13 +84,13 @@ run;
 /* ----------------------------------------------------------- */
 /* Pearson's chi-square test for the frequency if missing FICO */
 /* ----------------------------------------------------------- */
-%macro test_loop(test);
-  proc sort data = &test nodupkey out = uni_fico;
+%macro test_loop(t_var);
+  proc sort data = test_missing nodupkey out = uni_fico;
     by loan_id;
   run;
   ods output OneWayFreqs = test;
-  proc freq data = &test;
-    where missing(cscore_b);
+  proc freq data = test_missing;
+    where missing(&t_var);
     table next_stat;
   run;
   data _null_;
@@ -111,21 +110,22 @@ run;
   ods &extension select all;
   
   
-  title "Univariate analysis of FICO";
+  title "Univariate analysis of &t_var";
   proc univariate data = uni_fico;
-    var cscore_b;
-    histogram cscore_b / normal ( mu = est sigma = est color = blue w = 2.5);
+    var &t_var;
+    histogram &t_var / normal ( mu = est sigma = est color = blue w = 2.5);
   run;
   title;
   title "Pearson's chi-square test";
-  proc freq data = &test;
-  where ^missing(cscore_b) and next_stat in ("&varlist");
+  proc freq data = test_missing;
+  where ^missing(&t_var) and next_stat in ("&varlist");
   table next_stat / chisq 
     testp = (&testlist);
   run;
   title;
   ods &extension select none;
 %mend test_loop;
+
 
 
 /* ------------------------------------------------ */
@@ -274,9 +274,10 @@ run;
   options nodate;
   ods noproctitle;
 
-  %scat_plot();
-  %time_plot();
+/*   %scat_plot(); */
+/*   %time_plot(); */
   
+  %test_loop(dti);
   ods &extension close;
 %mend outres;
 
@@ -284,14 +285,14 @@ run;
 
 quit;
 
-*ods trace on;
-ods output CrossTabFreqs = _tmp;
-proc freq data = PD_DATA.train_cur (where = ((cscore_b le 670) and (^missing(act_upb))));
-  table next_stat * orig_chn;
-run;
-proc sgplot data = _tmp(where = (next_stat = "PPY"));
-  vbar colPercent / response = colPercent group = orig_chn stat = sum;
-  yaxis label = "P of Prepayment";
-  xaxis label = "test";
-run;
+/* *ods trace on; */
+/* ods output CrossTabFreqs = _tmp; */
+/* proc freq data = PD_DATA.train_cur (where = ((cscore_b le 670) and (^missing(act_upb)))); */
+/*   table next_stat * orig_chn; */
+/* run; */
+/* proc sgplot data = _tmp(where = (next_stat = "PPY")); */
+/*   vbar colPercent / response = colPercent group = orig_chn stat = sum; */
+/*   yaxis label = "P of Prepayment"; */
+/*   xaxis label = "test"; */
+/* run; */
 

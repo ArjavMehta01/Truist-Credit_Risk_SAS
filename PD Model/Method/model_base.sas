@@ -15,8 +15,8 @@ proc freq data = DATA.loan;
 run;
 
 
-%let CUR_var = OLTV cscore_b orig_amt loan_age;
-%let DEL_var = OLTV cscore_b;
+%let CUR_var = CLTV cscore_b orig_amt loan_age;
+%let DEL_var = CLTV cscore_b;
 /* %let DEL_var = dti cscore_b hs ppi hpi ump gdp; */
 
 %macro test(num);
@@ -201,3 +201,9 @@ ods powerpoint file = "&p_report/model_1.ppt"
 
 ods powerpoint close;
 
+
+proc boxplot data = xyz;
+  plot purpose * diff_m;
+run;
+
+ods graphics max
