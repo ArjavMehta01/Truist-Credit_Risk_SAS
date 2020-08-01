@@ -300,40 +300,7 @@ run;
 
 
 
-
-
-
-data xyz;
-set PD_DATA.test_final_cur;
-if next_stat = 'PPY' then flag = 1;
-else flag = 0; 
-
-run;
-
-
-proc logistic data = xyz (where = (cscore_b > 670 )) plots(Maxpoints = NONE ) = all;
-class flag (ref = '0');
-model flag = diff_Mortgage;
-run;
-
-proc boxplot data = xyz;
-plot diff_Mortgage;
-run;
-
-ods graphics on ;
-proc sgplot data = xyz (where = (cscore_b < 670));
-vbox diff_Mortgage / group = purpose ;
-run;
-ods graphics off;
-
-
-ods output CrossTabFreqs = _tmp;
-proc freq data = PD_DATA.train_final_cur (where = ((cscore_b le 670) and (^missing(act_upb))));
-  table next_stat * Purpose;
-run;
-
-
-data PD_DATA.train_Final_cur( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI ));
+data PD_DATA.train_Final_cur( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI Payroll_mean = Payrolls));
 merge PD_DATA.train_Final_cur test;
 label 
 HS_mean = 'Housing Starts'
@@ -347,7 +314,7 @@ by yqtr;
 run;
 
 
-data PD_DATA.train_final_del( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI  ));
+data PD_DATA.train_final_del( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI Payroll_mean = Payrolls ));
 merge PD_DATA.train_Final_del test;
 label 
 HS_mean = 'Housing Starts'
@@ -361,7 +328,7 @@ by yqtr;
 run;
 
 
-data PD_DATA.test_final_cur( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI  ));
+data PD_DATA.test_final_cur( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI Payroll_mean = Payrolls  ));
 merge PD_DATA.test_final_cur test;
 label 
 HS_mean = 'Housing Starts'
@@ -377,7 +344,7 @@ run;
 
 
 
-data PD_DATA.test_final_del( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI ));
+data PD_DATA.test_final_del( drop = HS PPI HPI Permits date_mean rename = (HS_mean = HS PPI_mean = PPI Permits_mean = Permits HPI_mean =HPI Payroll_mean = Payrolls));
 merge PD_DATA.test_Final_del test;
 label 
 HS_mean = 'Housing Starts'
@@ -390,15 +357,44 @@ format HS_mean PPI_mean Permits_mean HPI_mean Payroll_mean comma10.2;
 by yqtr;
 run;
 
+data xyz ;
+set PD_DATA.test_final_cur;
+UPB_Ratio = act_upb / orig_amt ;
+run;
+
+/* Running Binomial Logistic Regression on Diff_Mortgage */
+
+
+data xyz;
+set PD_DATA.train_final_cur;
+if next_stat = 'PPY' then flag = 1;
+else flag = 0; 
+run;
+
+proc logistic data = xyz (where = (cscore_b < 670 )) plots(Maxpoints = 5000 ) = all;
+class flag (ref = '1');
+model flag = diff_Mortgage / link = glogit;
+weight act_upb /normalize;
+run;
+
+proc boxplot data = xyz;
+plot diff_Mortgage*Purpose / MAXPANELS=100;
+run;
+
+ods output CrossTabFreqs = _tmp;
+proc freq data = PD_DATA.train_final_cur (where = ((cscore_b le 670) and (^missing(act_upb))));
+  table next_stat * Purpose;
+run;
+
+/* Splitting the Data into Two segments */
 
 %let score = 670;
 %let seg = cscore_b;
 %let n_c1 = Sub_Prime;
 %let n_c2 = Prime;
 
-/* proc glmselect data = PD_DATA.train_cur_sub; */
-/* run; */
-%let Macros = HS PPI Permits UMP Payrolls  ;
+
+%let Macros = HS PPI Permits UMP Payrolls MortgageRt ;
 
 %let MacroTransf = QGT_GDP QRT_GDP AG_GDP QDT_UMP QGT_UMP AG_UMP ggr lagging_UMP GDP_Annual_Rate ;
 
@@ -449,6 +445,8 @@ ods output CrossTabFreqs = _tmp;
 proc freq data = PD_DATA.train_final_cur (where = ((cscore_b le 670) and (^missing(act_upb))));
   table next_stat * Purpose;
 run;
+
+
 proc sgplot data = _tmp(where = (next_stat = "DEL"));
   vbar colPercent / response = colPercent group = Purpose stat = sum;
   yaxis label = "Percentage of Loans in state DEL ";
@@ -467,15 +465,40 @@ run;
 
 %let Macros = HS Permits Payrolls ;
 
-%let MacroTransf = QDT_UMP ;
+%let MacroTransf = QDT_UMP GDP_Annual_Rate ;
 
 %let CUR_var = CLTV dti cscore_b orig_amt loan_age Orig_rt Orig_trm &Macros &MacroTransf diff_Mortgage;
 
 %let DEL_var = CLTV Orig_rt HS QGT_GDP QDT_UMP;
 
-proc corr data = c&num._&d_pd pearson;
+
+  proc template;
+      edit Base.Corr.StackedMatrix;
+         column (RowName RowLabel) (Matrix) * (Matrix2);
+         edit matrix;
+            cellstyle _val_  = -1.00 as {backgroundcolor=CXEEEEEE},
+                      _val_ <= -0.75 as {backgroundcolor=wheat},
+                      _val_ <= -0.50 as {backgroundcolor=pink},
+                      _val_ <= -0.25 as {backgroundcolor=cyan},
+                      _val_ <=  0.25 as {backgroundcolor=white},
+                      _val_ <=  0.50 as {backgroundcolor=cyan},
+                      _val_ <=  0.75 as {backgroundcolor=pink},
+                      _val_ <   1.00 as {backgroundcolor= wheat},
+                      _val_  =  1.00 as {backgroundcolor=CXEEEEEE};
+            end;
+         end;
+      run;
+  
+
+ proc corr data = PD_DATA.train_final_cur  nosimple nomiss plots (MAXPOINTS = NONE) = all;
 var &Cur_var;
+ods select PearsonCorr;
 run;
+   
+   proc template;
+      delete Base.Corr.StackedMatrix;
+   run;
+
 
 
 /* Orig_chn */
@@ -485,17 +508,23 @@ run;
 /*  */
 /* %let Del_Var = Orig_rt Num_bo CLTV Dti*/
 
+%let d_pd = CUR;
 
+%let c_Var = Purpose Orig_chn;
+%let Macros = Permits  ;
+%let MacroTransf =  GDP_Annual_Rate QDT_UMP ;
+%let CUR_Var = CLTV  Dti diff_Mortgage    &Macros &MacroTransf  ; 
+%let num = 1;
 
 %macro test(num);
 
  %if "&d_pd" = "CUR" %then %do;
-    %let next = PPY;
-    %let n_next = Prepay;
-  %end;
-  %if "&d_pd" = "DEL" %then %do;
     %let next = DEL;
     %let n_next = Delinquent;
+  %end;
+  %if "&d_pd" = "DEL" %then %do;
+    %let next = SDQ;
+    %let n_next = Default;
     %let c_var = ;
   %end;
 
@@ -512,9 +541,9 @@ run;
     code file = "%sysfunc(getoption(work))/&num._tmp.sas";
   run;
     
-/* proc plm source = c&num._&d_pd._File; */
-/*  effectplot slicefit( x = CLTV sliceby = cscore_b  plotby = next_stat) / ilink; */
-/* run; */
+proc plm source = c&num._&d_pd._File;
+ effectplot slicefit( x = diff_Mortgage plotby = next_stat) / ilink;
+run;
 
   ods html exclude none;
   title "Parameter Estimates";
@@ -718,30 +747,44 @@ run;
 
 /*  QGT_GDP QRT_GDP AG_GDP QDT_UMP QGT_UMP AG_UMP ggr lagging_UMP GDP_Annual_Rate */
 
-%let c_var = Purpose Orig_chn ;
+/* cscore_b Orig_amt HS PPI AG_GDP AG_UMP UMP 
 
-%let Macros = HS Permits PPI  ;
+%let CUR_var =  CLTV dti cscore_b orig_amt loan_age  HS  &MacroTransf  
 
-%let MacroTransf =  QDT_UMP GDP_Annual_Rate ;
-
-%let CUR_var =  CLTV dti cscore_b orig_amt loan_age  HS  &MacroTransf  ;
-
-%let DEL_var = CLTV Orig_rt HS QGT_GDP QDT_UMP;
+*/
 
 %let d_pd = CUR;
 
+%let c_Var = Purpose Orig_chn;
+%let Macros = Permits  ;
+%let MacroTransf =  GDP_Annual_Rate QDT_UMP ;
+%let CUR_Var = CLTV  Dti diff_Mortgage    &Macros &MacroTransf  ; 
+%test(1);
+%test(2);
 
 %let d_pd = DEL;
-%let c_var = purpose;
-%let DEL_var = Cltv Orig_rt HS QGT_GDP QDT_UMP diff_Mortgage ;
-
-%let d_pd = CUR;
-%let Cur_Var = CLTV HS GDP_Annual_Rate QDT_UMP dti cscore_b ;
-%let c_var = Purpose;
-
+%let c_var = ;
+%let Macros = GDP_Annual_Rate QDT_UMP HS;
+%let DEL_Var = CLTV Curr_Rte dti cscore_b ;
 %test(1);
-
 %test(2);
+
+
+/* %let DEL_var = CLTV Orig_rt HS QGT_GDP QDT_UMP; */
+/*  */
+/*  */
+/*  */
+/* %let d_pd = DEL; */
+/* %let c_var = purpose; */
+/* %let DEL_var = Cltv Orig_rt HS QGT_GDP QDT_UMP diff_Mortgage ; */
+/*  */
+/* %let d_pd = CUR; */
+/* %let Cur_Var = CLTV HS GDP_Annual_Rate QDT_UMP dti cscore_b ; */
+/* %let c_var = Purpose; */
+/*  */
+/* %test(1); */
+/*  */
+/* %test(2); */
 
 
 
