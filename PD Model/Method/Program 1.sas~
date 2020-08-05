@@ -1,8 +1,10 @@
 
 
-
-
-/* Reading In MacroEconomic Variables */
+ proc import datafile="/folders/myfolders/Truist-Credit_Risk_SAS/PD Model/Data/test_del_dataset.csv"
+      dbms=csv
+      out=PD_DATA.test_final_del
+      replace;    
+ run;
 
 
 /* Reading in Unemployment data from Google Drive */
@@ -362,6 +364,19 @@ set PD_DATA.test_final_cur;
 UPB_Ratio = act_upb / orig_amt ;
 run;
 
+/*  */
+/* data PD_DATA.test ; */
+/* set PD_DATA.test_final_cur; */
+/* UPB_Ratio = act_upb / orig_amt ; */
+/* run; */
+/*  */
+/* data xyz ; */
+/* set PD_DATA.test_final_cur; */
+/* UPB_Ratio = act_upb / orig_amt ; */
+/* run; */
+
+
+
 /* Running Binomial Logistic Regression on Diff_Mortgage */
 
 
@@ -386,6 +401,14 @@ proc freq data = PD_DATA.train_final_cur (where = ((cscore_b le 670) and (^missi
   table next_stat * Purpose;
 run;
 
+
+
+/* data PD_DATA.train_Final_del; */
+/* set PD_DATA.train_Final_del; */
+/* if act_upb  = . then act_upb = Orig_amt ; */
+/* UPB_Ratio = act_upb / orig_amt; */
+/* run; */
+
 /* Splitting the Data into Two segments */
 
 %let score = 670;
@@ -396,11 +419,11 @@ run;
 
 %let Macros = HS PPI Permits UMP Payrolls MortgageRt ;
 
-%let MacroTransf = QGT_GDP QRT_GDP AG_GDP QDT_UMP QGT_UMP AG_UMP ggr lagging_UMP GDP_Annual_Rate ;
+%let MacroTransf = QGT_GDP QRT_GDP AG_GDP QDT_UMP QGT_UMP AG_UMP ggr lagging_UMP GDP_Annual_Rate QDT_GDP;
 
-%let CUR_var = CLTV dti cscore_b orig_amt purpose curr_rte loan_age Orig_chn Orig_rt Orig_trm Num_bo &Macros &MacroTransf diff_mortgage;
+%let CUR_var = CLTV dti cscore_b orig_amt purpose curr_rte loan_age Orig_chn Orig_rt Orig_trm Num_bo Orig_dte fthb_flg &Macros &MacroTransf diff_mortgage;
 
-%let DEL_var = CLTV dti cscore_b Orig_chn Orig_rt Orig_trm Num_bo curr_rte &Macros &MacroTransf diff_Mortgage;
+%let DEL_var = CLTV curr_rte dti cscore_b GDP HS QDT_UMP ratio_upb GDP_Annual_rate ratio_upb Mortgage30US QDT_GDP;
 
 %macro Split_Data(d_pd);
   %if "&d_pd" = "CUR" %then %do;
@@ -415,24 +438,26 @@ run;
 * Split training dataset into two classes;
   data c1_&d_pd c2_&d_pd ;
     set PD_DATA.train_final_&d_pd ;
-  
+ 
+    if ^missing(&seg);
     if 0 < &seg < &score then output c1_&d_pd;
     if &score <= &seg then output c2_&d_pd;
-    if ^missing(&seg);
 
     keep &&&d_pd._var next_stat yqtr act_upb;
-
+    
   run;
   
 * Split testing dataset into two classes;
   data c1_test_&d_pd c2_test_&d_pd;
     set PD_DATA.test_final_&d_pd;
-
+    
+    if orig_dte < '31DEC2007'd ; 
+    if ^missing(&seg);
     if 0 < &seg < &score then output c1_test_&d_pd;
     if &score <= &seg then output c2_test_&d_pd ;
-    if ^missing(&seg);
-    keep &&&d_pd._var next_stat yqtr act_upb  ;
     
+    keep &&&d_pd._var next_stat yqtr act_upb  ;
+
   run;
 
 %mend Split_Data;
@@ -513,14 +538,33 @@ run;
 %let c_Var = Purpose Orig_chn;
 %let Macros = Permits  ;
 %let MacroTransf =  GDP_Annual_Rate QDT_UMP ;
-%let CUR_Var = CLTV  Dti diff_Mortgage cscore_b   &Macros &MacroTransf  ; 
+%let CUR_Var = CLTV  Dti diff_Mortgage    &Macros &MacroTransf  ; 
 %let num = 1;
+
+
+options nodate;
+
+ods powerpoint file = "&p_report/model1.ppt"
+               style = Sapphire;
+               
+ods powerpoint exclude all;  
+ods rtf file="&p_report/Current_Model.rtf"  style=Sapphire bodytitle nogtitle;
+ods rtf select all;            
+               
+ods html file = "&p_report/model1.html"
+        style = Sapphire;
+        
+        
+ods html exclude all;
+
+proc options option=config;
+run;
 
 %macro test(num);
 
  %if "&d_pd" = "CUR" %then %do;
-    %let next = DEL;
-    %let n_next = Delinquent;
+    %let next = PPY;
+    %let n_next = Prepayment;
   %end;
   %if "&d_pd" = "DEL" %then %do;
     %let next = SDQ;
@@ -529,36 +573,37 @@ run;
   %end;
 
 
+
+  
 * Multinomial Logistic Regression;
-  ods output ParameterEstimates = &d_pd._c&num._pa(keep = variable response classval0 estimate probchisq);
+  ods output ParameterEstimates = &d_pd._c&num._pa(keep = variable response classval0  estimate probchisq);
   proc logistic data = c&num._&d_pd;
     class next_stat (ref = "&d_pd") &c_var / param = glm;
-    model next_stat = &&&d_pd._var &c_var/ link = glogit  rsquare cl lackfit ;
+    model next_stat = &&&d_pd._var &c_var/ link = glogit  rsquare cl lackfit  ;
+/*     output out = out2 p = pred; */
     weight act_upb / normalize;
     lsmeans / e ilink cl;
     store c&num._&d_pd._File;
-output out=out2 p= pred;
     code file = "%sysfunc(getoption(work))/&num._tmp.sas";
   run;
     
+/* proc npar1way data=out2 edf; */
+/* class next_stat; */
+/* var pred; */
+/* run; */
     
-Proc npar1way data=out2 edf plots= all;
-class next_stat ;
-var pred;
-run;
-
-
-proc plm source = c&num._&d_pd._File;
- effectplot slicefit( x = diff_Mortgage plotby = next_stat) / ilink;
-run;
+/* proc plm source = c&num._&d_pd._File; */
+/*  effectplot slicefit( x = diff_Mortgage plotby = next_stat) / ilink; */
+/* run; */
 
   ods html exclude none;
   title "Parameter Estimates";
   title2 j = l "Data: &d_pd. Group: &&&n_c&num";
   proc report data = &d_pd._c&num._pa;
-    columns variable response classval0 estimate probchisq;
+    columns variable response classval0  estimate probchisq;
     define variable / "Variable" display;
     define response / "Response" display;
+    define classval0 / 'Class' display;
     define estimate / display;
     define probchisq / display;
     compute probchisq;
@@ -579,7 +624,7 @@ run;
     columns variable response classval0 estimate probchisq;
     define variable / "Variable" display;
     define response / "Response" display;
-    define classval0 / "Class" display;
+ 	define classval0 / 'class' display;
     define estimate / display;
     define probchisq / display;
     compute probchisq;
@@ -595,7 +640,7 @@ run;
     columns variable response classval0 estimate probchisq;
     define variable / "Variable" display;
     define response / "Response" display;
-    define classval0 / "Class" display;
+  define classval0 / 'class' display;
     define estimate / display;
     define probchisq / display;
     compute probchisq;
@@ -613,9 +658,10 @@ run;
   run;
   
 /*  c&num._&d_pd */
+/* c&num._test_&d_pd  */
 * Prediction for the test;
     data c&num._tmp;
-    set c&num._&d_pd;
+    set c&num._&d_pd  ;
     %include "%sysfunc(getoption(work))/&num._tmp.sas";
   run;
 /*  */
@@ -698,9 +744,15 @@ run;
   proc sort data = c&num._tmp;
     by yqtr;
   run;  
-  ods output Summary = c&num._plot2(keep = yqtr P_next_stat&next._Mean
-  											rename = (P_next_stat&next._Mean = predict));
+  ods output Summary = &d_pd._c&num._plot2(keep = yqtr P_next_stat:);
   proc means data = c&num._tmp(where = (act_upb ^= . )) mean ;
+    var p_:;
+    by yqtr;
+    weight act_upb;
+  run;
+   ods output Summary = c&num._plot2(keep = yqtr P_next_stat&next._Mean
+  											rename = (P_next_stat&next._Mean = predict));
+   proc means data = c&num._tmp(where = (act_upb ^= . )) mean ;
     var p_:;
     by yqtr;
     weight act_upb;
@@ -731,104 +783,97 @@ run;
 
 * Output the results;
   ods powerpoint exclude none;
+  ods rtf select all;
   title "Overall Prediction";
   proc print data = c&num._r noobs;
     format _numeric_ 8.2;
   run;  
   title;
   
-  title j = l "Group: &&&n_c&num";
+ods graphics / noborder height=5.3333in width=8in MAXOBS=100000000;
+
   proc sgplot data = c&num._plot;
     series x = yqtr y = historic / legendlabel = "Actual";
     series x = yqtr y = predict / lineattrs = (color = "cxe34a33" thickness = 2) legendlabel = "Predicted";
-    inset ("&K1" = "&V1"
-           "&K3" = "&V3") / border opaque;
+ 
     xaxis label = "Year" grid;
     yaxis label = "Probability of &n_next (%)" grid;
   run;
   title;
+  ods rtf select none;
   ods powerpoint exclude all;  
   
 %mend test;
 
 
-/*  QGT_GDP QRT_GDP AG_GDP QDT_UMP QGT_UMP AG_UMP ggr lagging_UMP GDP_Annual_Rate */
-
-/* cscore_b Orig_amt HS PPI AG_GDP AG_UMP UMP 
-
-%let CUR_var =  CLTV dti cscore_b orig_amt loan_age  HS  &MacroTransf  
-
-*/
 
 %let d_pd = CUR;
-
-%let c_Var = Purpose Orig_chn;
-%let Macros = Permits HS ;
-%let MacroTransf =  ggr ;
-%let CUR_Var = CLTV  Dti diff_Mortgage cscore_b   &Macros &MacroTransf  ; 
+/* Sub-Prime */
+%let c_Var =  Purpose Orig_chn ;
+%let MacroTransf = GDP_annual_rate  ;
+%let CUR_Var = CLTV Dti diff_Mortgage cscore_b &MacroTransf  ; 
 %test(1);
+
+/* Prime */
+%let c_Var = Purpose Orig_chn ;
+%let Macros = Permits  ;
+%let MacroTransf = GDP_annual_rate  ;
+%let CUR_Var = CLTV Dti diff_Mortgage cscore_b  &Macros &MacroTransf  ; 
+
 %test(2);
+
+ods rtf close;
+ods powerpoint close;
+ods html close;
+
+
+
+/* Prime */
 
 %let d_pd = DEL;
 %let c_var = ;
-%let Macros = GDP_Annual_Rate QDT_UMP HS;
-%let DEL_Var = CLTV Curr_Rte dti cscore_b ;
-%test(1);
+%let DEL_Var = CLTV curr_rte cscore_b HS QDT_UMP;
+
 %test(2);
 
+/* Subprime  */
 
-/* %let DEL_var = CLTV Orig_rt HS QGT_GDP QDT_UMP; */
-/*  */
-/*  */
-/*  */
-/* %let d_pd = DEL; */
-/* %let c_var = purpose; */
-/* %let DEL_var = Cltv Orig_rt HS QGT_GDP QDT_UMP diff_Mortgage ; */
-/*  */
-/* %let d_pd = CUR; */
-/* %let Cur_Var = CLTV HS GDP_Annual_Rate QDT_UMP dti cscore_b ; */
-/* %let c_var = Purpose; */
-/*  */
-/* %test(1); */
-/*  */
-/* %test(2); */
+%let d_pd = DEL;
+%let c_var = ;
+%let DEL_Var = CLTV cscore_b GDP_Annual_Rate ;
+%test(1); 
 
 
 
-options nodate;
-ods powerpoint file = "&p_report/model1.ppt"
-               style = Sapphire;
- ods powerpoint exclude all;              
-               
-ods html file = "&p_report/model1.html"
-        style = Sapphire;
-        
-        
-ods html exclude all;
 
-proc options option=config;
-run;
-
-
+ods rtf close;
 ods powerpoint close;
 ods html close;
 
 
 
 
-proc Univariate data = PD_DATA.train_Final_cur plots ;
-var Orig_trm;
-run;
 
 
 
 
 
+/* proc corr data = PD_DATA.train_final_cur  nosimple nomiss plots (MAXPOINTS = NONE) = all; */
+/* var GDP_Annual_rate; */
+/* with QDT_UMP; */
+/* ods select PearsonCorr; */
+/* run; */
 
 
-
-
-
+/* data xyz ; */
+/* set PD_DATA.train_final_cur; */
+/* if next_stat = 'DEL' then Target_Var = 1; */
+/* else target_var = 0; */
+/* run; */
+/*  */
+/* proc reg data=xyz; */
+/* model  target_var = CLTV Dti Cscore_b diff_mortgage  Permits GDP_annual_rate QDT_UMP  / vif tol collin; */
+/* run; */
 
 /* proc hpbin data= PD_DATA.train_final_del numbin=5; */
 /* input loan_age/numbin=4; */
