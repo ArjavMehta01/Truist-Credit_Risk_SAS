@@ -17,7 +17,7 @@ ods noproctitle;
 
 %let var = oltv dti curr_rte loan_age hs ump ppi gdp;
 data PD_TMP.tmp_p PD_TMP.tmp_s;
-  set PD_DATA.cur(keep = &var fico next_stat);
+  set PD_DATA.train_cur(keep = &var fico next_stat);
   label hs = "Housing Starts"
         ump = "Unemployment Rate"
         ppi = "Producer Price Index"
